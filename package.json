@@ -16,6 +16,7 @@
   "dependencies": {
     "axios": "1.2.0-alpha.1",
     "esbuild": "^0.15.18",
+    "mongodb": "^4.12.1",
     "telegraf": "^4.11.2",
     "typegram": "^4.1.0",
     "uuid": "^9.0.0"
