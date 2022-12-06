@@ -1,9 +1,10 @@
 import "dotenv/config";
 
-import { Context, Markup, Telegraf } from "telegraf";
+import { Context, Input, Markup, Telegraf } from "telegraf";
 
 import { Update } from "typegram";
 import { message } from "telegraf/filters";
+import { v4 as uuidv4 } from "uuid";
 
 const bot: Telegraf<Context<Update>> = new Telegraf(
   process.env.BOT_TOKEN as string
@@ -32,7 +33,13 @@ bot.command("keyboard", (ctx) => {
     ])
   );
 });
+bot.command("picture", async (ctx) => {
+  await ctx.replyWithPhoto(
+    Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`)
+  );
+});
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
+bot.hears("hi", (ctx) => ctx.reply("Hey there"));
 
 bot.launch();
 
