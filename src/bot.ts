@@ -1,8 +1,8 @@
 import "dotenv/config";
 
 import { Context, Input, Markup, Telegraf } from "telegraf";
-import { InlineQueryResult, Update } from "typegram";
 
+import { Update } from "typegram";
 import { message } from "telegraf/filters";
 import { v4 as uuidv4 } from "uuid";
 
@@ -14,15 +14,20 @@ bot.start((ctx) => {
   ctx.reply("Hello " + ctx.from.first_name + "!");
 });
 bot.help((ctx) => {
-  ctx.reply("Send /start to receive a greeting");
-  ctx.reply("Send /keyboard to receive a message with a keyboard");
-  ctx.reply("Send /quit to stop the bot");
+  ctx.reply("Nothing to help");
 });
+// Commands
 bot.command("quit", (ctx) => {
-  // Explicit usage
-  ctx.telegram.leaveChat(ctx.message.chat.id);
-  // Context shortcut
-  ctx.leaveChat();
+  bot.telegram.getChatAdministrators(ctx.chat.id).then((data) => {
+    // TODO: admin middleware to allow admin remove bot
+    if (!data || !data.length) return;
+    if (data.some((admin) => admin.user.id === ctx.from.id)) {
+      ctx.telegram.leaveChat(ctx.message.chat.id);
+      ctx.leaveChat();
+    } else {
+      ctx.reply("踢你老母臭");
+    }
+  }).catch(console.log);
 });
 bot.command("keyboard", (ctx) => {
   ctx.reply(
@@ -38,12 +43,18 @@ bot.command("picture", async (ctx) => {
     Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`)
   );
 });
-bot.on('inline_query', async (ctx) => {
-    const result: readonly InlineQueryResult[] = [];
-    // Using context shortcut
-    await ctx.answerInlineQuery(result);
-});
+// Mentions
+bot.mention(process.env.BOT_NAME as string, (ctx)=>{
+    ctx.reply('👍');
+})
+// Actions
+bot.action('first', (ctx)=>{
+    ctx.reply("first");
+})
+bot.action('second', (ctx)=>{
+    ctx.reply("second");
+})
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
-bot.hears("hi", (ctx) => ctx.reply("Hey there"));
+bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
 
 export default bot;
