@@ -32,7 +32,7 @@ bot.command("keyboard", (ctx) => {
     ])
   );
 });
-bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
+// bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 
 bot.launch();
 
