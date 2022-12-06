@@ -23,7 +23,7 @@ build({
   outdir: "dist",
   bundle: true,
   platform: "node",
-  target: "es2016",
+  target: "esnext",
   // external: ['@babel/core', '@babel/types'].concat(Object.keys(dependencies)),
 
   loader: { ".ts": "ts" },
