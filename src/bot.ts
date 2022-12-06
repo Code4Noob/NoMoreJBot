@@ -61,9 +61,12 @@ bot.action("second", (ctx) => {
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
 bot.command("db", async (ctx) => {
-    const collection = db.collection('documents');
-    const findResult = await collection.find({}).toArray();
-    console.log(findResult)
-    ctx.reply(findResult[0].hello)
+  const collection = db.collection("documents");
+  const findResult = await collection.find({}).toArray();
+  console.log(findResult);
+  ctx.reply(findResult[0].hello);
+});
+bot.hashtag("test", (ctx) => {
+    ctx.reply('Tag!')
 });
 export default bot;
