@@ -1,6 +1,7 @@
 import { Chat, chatSchema } from "./chat";
 import { Schema, Types, model } from "mongoose";
 
+// TODO: restructure the relationship of user...chat... usage of _id?
 interface IUser {
   _id: Types.ObjectId;
   id: number;
@@ -9,6 +10,8 @@ interface IUser {
   username: string;
   language_code: string;
   chat: typeof Chat;
+  day?: number;
+  day_updated_at?: Date;
 }
 
 const userSchema = new Schema<IUser>({
@@ -19,6 +22,8 @@ const userSchema = new Schema<IUser>({
   username: { type: String, required: true },
   language_code: { type: String, required: true },
   chat: { type: chatSchema, required: true },
+  day: { type: Number },
+  day_updated_at: { type: Date },
 });
 
 const User = model("User", userSchema);

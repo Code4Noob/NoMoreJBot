@@ -5,6 +5,7 @@ import { dbConnect, dbDisconnect } from "./db";
 import { Update } from "typegram";
 import { message } from "telegraf/filters";
 import { v4 as uuidv4 } from "uuid";
+import { validateJCount } from "./utils";
 
 const bot: Telegraf<Context<Update>> = new Telegraf(
   process.env.BOT_TOKEN as string
@@ -15,7 +16,12 @@ bot.start(async (ctx) => {
   console.log({ id: ctx.message.from.id, "chat.id": ctx.chat.id });
   const res = await User.updateOne(
     { id: ctx.message.from.id, "chat.id": ctx.chat.id },
-    { ...ctx.message.from, chat: ctx.message.chat },
+    {
+      ...ctx.message.from,
+      chat: ctx.message.chat,
+      day: 0,
+      day_updated_at: new Date(),
+    },
     {
       upsert: true,
     }
@@ -41,12 +47,12 @@ bot.command("quit", (ctx) => {
     })
     .catch(console.log);
 });
-bot.command("keyboard", (ctx) => {
+bot.command("j", (ctx) => {
   ctx.reply(
-    "Keyboard",
+    "Jed?",
     Markup.inlineKeyboard([
-      Markup.button.callback("First option", "first"),
-      Markup.button.callback("Second option", "second"),
+      Markup.button.callback("Yes", "resetDay"),
+      Markup.button.callback("No", "updateDay"),
     ])
   );
 });
@@ -57,14 +63,44 @@ bot.command("picture", async (ctx) => {
 });
 // Mentions
 bot.mention(process.env.BOT_NAME as string, (ctx) => {
-  ctx.reply("👍");
+  ctx.reply("🤡");
 });
 // Actions
-bot.action("first", (ctx) => {
-  ctx.reply("first");
+bot.action("updateDay", async (ctx) => {
+    const userId = ctx.update.callback_query.from.id
+    const chatId = ctx.update.callback_query.message?.chat.id
+  await User.findOne({
+    id: userId,
+    "chat.id": chatId,
+  }).then((obj) => {
+    if (!obj) return;
+    if (validateJCount(obj.day_updated_at)) {
+      User.updateOne(
+        { id: userId, "chat.id": chatId },
+        {
+          day: 999,
+          day_updated_at: new Date(),
+        }
+      );
+    } else {
+      ctx.reply("You have already updated day today!");
+    }
+  });
 });
-bot.action("second", (ctx) => {
-  ctx.reply("second");
+bot.action("resetDay", async (ctx) => {
+//   await User.findOne({
+//     id: ctx.callback_query.from.id,
+//     "chat.id": ctx.chat.id,
+//   }).then((obj) => {
+//     if (!obj) return;
+//     User.updateOne(
+//       { id: ctx.message.from.id, "chat.id": ctx.chat.id },
+//       {
+//         day: 999,
+//         day_updated_at: new Date(),
+//       }
+//     );
+//   });
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
@@ -81,7 +117,8 @@ bot.command("me", async (ctx) => {
     id: ctx.message.from.id,
     "chat.id": ctx.chat.id,
   }).then((obj) => {
-    if (obj) ctx.reply(`${obj.first_name} from ${obj.chat.title}`);
+    if (obj)
+      ctx.reply(`${obj.first_name} from ${obj.chat.title} | Day${obj.day}`);
   });
 });
 bot.hashtag("test", (ctx) => {
