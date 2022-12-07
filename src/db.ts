@@ -1,7 +1,17 @@
-import { MongoClient } from "mongodb";
+import { connect, disconnect, set } from "mongoose";
 
 // Connection URL
 const url = `mongodb://${process.env.MONGOUSER}:${process.env.MONGOPASSWORD}@${process.env.MONGOHOST}:${process.env.MONGOPORT}`;
-const client = new MongoClient(url);
+set("strictQuery", true);
 
-export default client;
+const dbConnect = async () => {
+  return await connect(url, {
+    dbName: process.env.dbName,
+  });
+};
+
+const dbDisconnect = () => {
+  disconnect();
+};
+
+export { dbConnect, dbDisconnect };

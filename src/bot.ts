@@ -1,7 +1,8 @@
 import { Context, Input, Markup, Telegraf } from "telegraf";
+import { User, userSchema } from "./models/user";
+import { dbConnect, dbDisconnect } from "./db";
 
 import { Update } from "typegram";
-import client from "./db";
 import { message } from "telegraf/filters";
 import { v4 as uuidv4 } from "uuid";
 
@@ -9,9 +10,16 @@ const bot: Telegraf<Context<Update>> = new Telegraf(
   process.env.BOT_TOKEN as string
 );
 
-const db = client.db(process.env.DBNAME);
-
-bot.start((ctx) => {
+dbConnect();
+bot.start(async (ctx) => {
+  console.log({ id: ctx.message.from.id, "chat.id": ctx.chat.id });
+  const res = await User.updateOne(
+    { id: ctx.message.from.id, "chat.id": ctx.chat.id },
+    { ...ctx.message.from, chat: ctx.message.chat },
+    {
+      upsert: true,
+    }
+  );
   ctx.reply("Hello " + ctx.from.first_name + "!");
 });
 bot.help((ctx) => {
@@ -60,13 +68,21 @@ bot.action("second", (ctx) => {
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
-bot.command("db", async (ctx) => {
-  await client.connect();
-  const collection = db.collection("documents");
-  const findResult = await collection.find({}).toArray();
-  client.close()
-  console.log(findResult);
-  ctx.reply(findResult[0].hello);
+bot.command("users", async (ctx) => {
+  // TODO: await, type
+  User.find({}, function (err: Error, docs: typeof User[]) {
+    docs.forEach((user, index) => {
+      ctx.reply(`${index}: ${user.first_name} from ${user.chat.title}`);
+    });
+  });
+});
+bot.command("me", async (ctx) => {
+  await User.findOne({
+    id: ctx.message.from.id,
+    "chat.id": ctx.chat.id,
+  }).then((obj) => {
+    if (obj) ctx.reply(`${obj.first_name} from ${obj.chat.title}`);
+  });
 });
 bot.hashtag("test", (ctx) => {
   ctx.reply("Tag!");
