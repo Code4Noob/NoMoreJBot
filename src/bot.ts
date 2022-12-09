@@ -18,7 +18,7 @@ const closeKeyboard = async (ctx: Context) => {
   });
 };
 bot.start(async (ctx) => {
-  console.log({ id: ctx.message.from.id, "chat.id": ctx.chat.id });
+    console.log(ctx.message.from)
   const res = await User.updateOne(
     { id: ctx.message.from.id, "chat.id": ctx.chat.id },
     {

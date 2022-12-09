@@ -7,7 +7,7 @@ interface IUser {
   id: number;
   is_bot: boolean;
   first_name: string;
-  username: string;
+  username?: string;
   language_code: string;
   chat: typeof Chat;
   day?: number;
@@ -19,7 +19,7 @@ const userSchema = new Schema<IUser>({
   id: { type: Number, required: true },
   is_bot: { type: Boolean, required: true },
   first_name: { type: String, required: true },
-  username: { type: String, required: true },
+  username: { type: String },
   language_code: { type: String, required: true },
   chat: { type: chatSchema, required: true },
   day: { type: Number },
