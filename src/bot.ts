@@ -12,6 +12,11 @@ const bot: Telegraf<Context<Update>> = new Telegraf(
 );
 
 dbConnect();
+const closeKeyboard = async (ctx: Context) => {
+  await ctx.editMessageReplyMarkup({
+    reply_markup: { remove_keyboard: true },
+  });
+};
 bot.start(async (ctx) => {
   console.log({ id: ctx.message.from.id, "chat.id": ctx.chat.id });
   const res = await User.updateOne(
@@ -86,7 +91,7 @@ bot.action("updateDay", async (ctx) => {
   await User.findOne({
     id: userId,
     "chat.id": chatId,
-  }).then((obj) => {
+  }).then(async (obj) => {
     if (!obj) return;
     if (validateJCount(obj.day_updated_at)) {
       obj.day = obj.day + 1;
@@ -96,6 +101,7 @@ bot.action("updateDay", async (ctx) => {
     } else {
       ctx.reply("You have already updated day today!");
     }
+    closeKeyboard(ctx);
   });
 });
 bot.action("resetDay", async (ctx) => {
@@ -105,13 +111,13 @@ bot.action("resetDay", async (ctx) => {
     id: userId,
     "chat.id": chatId,
   }).then((obj) => {
-    console.log(obj);
     if (!obj) return;
     obj.day = 0;
     obj.day_updated_at = new Date();
     obj.save();
     ctx.reply(`${obj.first_name} | Day${obj.day}`);
   });
+  closeKeyboard(ctx);
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
@@ -120,6 +126,7 @@ bot.command("users", async (ctx) => {
   const medal = ["🥇", "🥈", "🥉"];
   const shit = "💩";
   let usersMsg = `${ctx.message.chat.title}\n`;
+  // TODO: should not use clone?
   await User.find(
     { "chat.id": ctx.message.chat.id },
     function (err: Error, docs: typeof User[]) {
