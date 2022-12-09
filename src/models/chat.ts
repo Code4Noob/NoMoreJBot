@@ -1,7 +1,7 @@
 import { Schema, Types, model } from "mongoose";
 
 interface IChat {
-  _id: Types.ObjectId;
+  // _id: Types.ObjectId;
   id: number;
   title: string;
   type: string;
@@ -9,7 +9,7 @@ interface IChat {
 }
 
 const chatSchema = new Schema<IChat>({
-  _id: { type: Schema.Types.ObjectId, required: true },
+  // _id: { type: Schema.Types.ObjectId, required: true },
   id: { type: Number, required: true },
   title: { type: String, required: true },
   type: { type: String, required: true },

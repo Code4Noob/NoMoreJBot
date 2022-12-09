@@ -20,7 +20,7 @@ bot.start(async (ctx) => {
       ...ctx.message.from,
       chat: ctx.message.chat,
       day: 0,
-      day_updated_at: new Date(),
+      day_updated_at: null,
     },
     {
       upsert: true,
@@ -30,6 +30,20 @@ bot.start(async (ctx) => {
 });
 bot.help((ctx) => {
   ctx.reply("Nothing to help");
+});
+bot.command("dummy", async (ctx) => {
+  const res = await User.updateOne(
+    { id: Math.floor(Math.random() * 100), "chat.id": ctx.chat.id },
+    {
+      ...ctx.message.from,
+      chat: ctx.message.chat,
+      day: Math.floor(Math.random() * 100),
+      day_updated_at: null,
+    },
+    {
+      upsert: true,
+    }
+  );
 });
 // Commands
 bot.command("quit", (ctx) => {
@@ -67,58 +81,64 @@ bot.mention(process.env.BOT_NAME as string, (ctx) => {
 });
 // Actions
 bot.action("updateDay", async (ctx) => {
-    const userId = ctx.update.callback_query.from.id
-    const chatId = ctx.update.callback_query.message?.chat.id
+  const userId = ctx.update.callback_query.from.id;
+  const chatId = ctx.update.callback_query.message?.chat.id;
   await User.findOne({
     id: userId,
     "chat.id": chatId,
   }).then((obj) => {
     if (!obj) return;
     if (validateJCount(obj.day_updated_at)) {
-      User.updateOne(
-        { id: userId, "chat.id": chatId },
-        {
-          day: 999,
-          day_updated_at: new Date(),
-        }
-      );
+      obj.day = obj.day + 1;
+      obj.day_updated_at = new Date();
+      obj.save();
+      ctx.reply(`${obj.first_name} from ${obj.chat.title} | Day${obj.day}`);
     } else {
       ctx.reply("You have already updated day today!");
     }
   });
 });
 bot.action("resetDay", async (ctx) => {
-//   await User.findOne({
-//     id: ctx.callback_query.from.id,
-//     "chat.id": ctx.chat.id,
-//   }).then((obj) => {
-//     if (!obj) return;
-//     User.updateOne(
-//       { id: ctx.message.from.id, "chat.id": ctx.chat.id },
-//       {
-//         day: 999,
-//         day_updated_at: new Date(),
-//       }
-//     );
-//   });
+  const userId = ctx.update.callback_query.from.id;
+  const chatId = ctx.update.callback_query.message?.chat.id;
+  await User.findOne({
+    id: userId,
+    "chat.id": chatId,
+  }).then((obj) => {
+    console.log(obj);
+    if (!obj) return;
+    obj.day = 0;
+    obj.day_updated_at = new Date();
+    obj.save();
+    ctx.reply(`${obj.first_name} | Day${obj.day}`);
+  });
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
 bot.command("users", async (ctx) => {
   // TODO: await, type
-  User.find({}, function (err: Error, docs: typeof User[]) {
-    docs.forEach((user, index) => {
-      ctx.reply(`${index}: ${user.first_name} from ${user.chat.title}`);
-    });
-  });
+  const medal = ["🥇", "🥈", "🥉"];
+  const shit = "💩";
+  let usersMsg = `${ctx.message.chat.title}\n`;
+  await User.find(
+    { "chat.id": ctx.message.chat.id },
+    function (err: Error, docs: typeof User[]) {
+      docs
+        .sort((a, b) => b.day - a.day)
+        .forEach((user, index) => {
+          let emoji = medal[index] ?? shit;
+          usersMsg += `${emoji} Day${user.day} | ${user.first_name}\n`;
+        });
+      ctx.reply(usersMsg);
+    }
+  ).clone();
 });
 bot.command("me", async (ctx) => {
   await User.findOne({
     id: ctx.message.from.id,
     "chat.id": ctx.chat.id,
   }).then((obj) => {
-    if (obj)
-      ctx.reply(`${obj.first_name} from ${obj.chat.title} | Day${obj.day}`);
+    if (obj) ctx.reply(`${obj.first_name} | Day${obj.day}`);
   });
 });
 bot.hashtag("test", (ctx) => {
