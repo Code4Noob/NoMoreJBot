@@ -1,11 +1,14 @@
 import { Context, Input, Markup, Telegraf } from "telegraf";
 import { User, userSchema } from "./models/user";
 import { dbConnect, dbDisconnect } from "./db";
+import { fromNow, validateJCount } from "./utils";
 
 import { Update } from "typegram";
 import { message } from "telegraf/filters";
+import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
-import { validateJCount } from "./utils";
+
+moment.tz.setDefault("Asia/Taipei");
 
 const bot: Telegraf<Context<Update>> = new Telegraf(
   process.env.BOT_TOKEN as string
@@ -18,7 +21,6 @@ const closeKeyboard = async (ctx: Context) => {
   });
 };
 bot.start(async (ctx) => {
-    console.log(ctx.message.from)
   const res = await User.updateOne(
     { id: ctx.message.from.id, "chat.id": ctx.chat.id },
     {
@@ -95,7 +97,7 @@ bot.action("updateDay", async (ctx) => {
     if (!obj) return;
     if (validateJCount(obj.day_updated_at)) {
       obj.day = obj.day + 1;
-      obj.day_updated_at = new Date();
+      obj.day_updated_at = moment();
       obj.save();
       ctx.reply(`${obj.first_name} from ${obj.chat.title} | Day${obj.day}`);
     } else {
@@ -113,7 +115,7 @@ bot.action("resetDay", async (ctx) => {
   }).then((obj) => {
     if (!obj) return;
     obj.day = 0;
-    obj.day_updated_at = new Date();
+    obj.day_updated_at = moment();
     obj.save();
     ctx.reply(`${obj.first_name} | Day${obj.day}`);
   });
@@ -147,6 +149,9 @@ bot.command("me", async (ctx) => {
   }).then((obj) => {
     if (obj) ctx.reply(`${obj.first_name} | Day${obj.day}`);
   });
+});
+bot.command("from", async (ctx) => {
+  ctx.reply(fromNow(ctx.message.text.replace("/from", "").trim()));
 });
 bot.hashtag("test", (ctx) => {
   ctx.reply("Tag!");
