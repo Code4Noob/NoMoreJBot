@@ -97,7 +97,7 @@ bot.action("updateDay", async (ctx) => {
     if (!obj) return;
     if (validateJCount(obj.day_updated_at)) {
       obj.day = obj.day + 1;
-      obj.day_updated_at = moment();
+      obj.day_updated_at = moment().toDate();
       obj.save();
       ctx.reply(`${obj.first_name} from ${obj.chat.title} | Day${obj.day}`);
     } else {
@@ -115,7 +115,7 @@ bot.action("resetDay", async (ctx) => {
   }).then((obj) => {
     if (!obj) return;
     obj.day = 0;
-    obj.day_updated_at = moment();
+    obj.day_updated_at = moment().toDate();
     obj.save();
     ctx.reply(`${obj.first_name} | Day${obj.day}`);
   });
