@@ -1,7 +1,9 @@
 import { connect, disconnect, set } from "mongoose";
 
 // Connection URL
-const url = `mongodb://${process.env.MONGOUSER}:${process.env.MONGOPASSWORD}@${process.env.MONGOHOST}:${process.env.MONGOPORT}`;
+const url =
+  process.env.MONOGOURL ??
+  `mongodb://${process.env.MONGOUSER}:${process.env.MONGOPASSWORD}@${process.env.MONGOHOST}:${process.env.MONGOPORT}`;
 set("strictQuery", true);
 
 const dbConnect = async () => {

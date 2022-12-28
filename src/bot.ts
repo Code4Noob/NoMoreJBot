@@ -4,6 +4,7 @@ import { dbConnect, dbDisconnect } from "./db";
 import { fromNow, validateJCount } from "./utils";
 
 import { Update } from "typegram";
+import axios from "axios";
 import { message } from "telegraf/filters";
 import moment from "moment-timezone";
 import { v4 as uuidv4 } from "uuid";
@@ -122,7 +123,6 @@ bot.action("resetDay", async (ctx) => {
   closeKeyboard(ctx);
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
-bot.hears(/\b(hi)\b/i, (ctx) => ctx.reply("Hey there"));
 bot.command("users", async (ctx) => {
   // TODO: await, type
   const medal = ["🥇", "🥈", "🥉"];
@@ -153,6 +153,12 @@ bot.command("me", async (ctx) => {
 bot.command("from", async (ctx) => {
   ctx.reply(fromNow(ctx.message.text.replace("/from", "").trim()));
 });
+bot.command("outlook", async (ctx) => {
+  axios.get('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc').then(function (response) {
+    ctx.reply(response.data.outlook);
+  })
+});
+bot.hears(/\b(Gay)\b/i, (ctx) => ctx.reply("Gay there"));
 bot.hashtag("test", (ctx) => {
   ctx.reply("Tag!");
 });

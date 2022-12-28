@@ -5,7 +5,7 @@ interface IChat {
   id: number;
   title: string;
   type: string;
-  all_members_are_administrators: boolean;
+  all_members_are_administrators?: boolean;
 }
 
 const chatSchema = new Schema<IChat>({
@@ -13,7 +13,7 @@ const chatSchema = new Schema<IChat>({
   id: { type: Number, required: true },
   title: { type: String, required: true },
   type: { type: String, required: true },
-  all_members_are_administrators: { type: Boolean, required: true },
+  all_members_are_administrators: { type: Boolean },
 });
 
 const Chat = model("Chat", chatSchema);
