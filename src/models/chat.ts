@@ -11,7 +11,7 @@ interface IChat {
 const chatSchema = new Schema<IChat>({
   // _id: { type: Schema.Types.ObjectId, required: true },
   id: { type: Number, required: true },
-  title: { type: String, required: true },
+  title: { type: String },
   type: { type: String, required: true },
   all_members_are_administrators: { type: Boolean },
 });

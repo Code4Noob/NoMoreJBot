@@ -39,20 +39,20 @@ bot.start(async (ctx) => {
 bot.help((ctx) => {
   ctx.reply("Nothing to help");
 });
-bot.command("dummy", async (ctx) => {
-  const res = await User.updateOne(
-    { id: Math.floor(Math.random() * 100), "chat.id": ctx.chat.id },
-    {
-      ...ctx.message.from,
-      chat: ctx.message.chat,
-      day: Math.floor(Math.random() * 100),
-      day_updated_at: null,
-    },
-    {
-      upsert: true,
-    }
-  );
-});
+// bot.command("dummy", async (ctx) => {
+//   const res = await User.updateOne(
+//     { id: Math.floor(Math.random() * 100), "chat.id": ctx.chat.id },
+//     {
+//       ...ctx.message.from,
+//       chat: ctx.message.chat,
+//       day: Math.floor(Math.random() * 100),
+//       day_updated_at: null,
+//     },
+//     {
+//       upsert: true,
+//     }
+//   );
+// });
 // Commands
 bot.command("quit", (ctx) => {
   bot.telegram
@@ -90,35 +90,39 @@ bot.mention(process.env.BOT_NAME as string, (ctx) => {
 // Actions
 bot.action("updateDay", async (ctx) => {
   const userId = ctx.update.callback_query.from.id;
-  const chatId = ctx.update.callback_query.message?.chat.id;
-  await User.findOne({
+  // const chatId = ctx.update.callback_query.message?.chat.id;
+  await User.find({
     id: userId,
-    "chat.id": chatId,
-  }).then(async (obj) => {
-    if (!obj) return;
-    if (validateJCount(obj.day_updated_at)) {
-      obj.day = obj.day + 1;
-      obj.day_updated_at = moment().toDate();
-      obj.save();
-      ctx.reply(`${obj.first_name} from ${obj.chat.title} | Day${obj.day}`);
-    } else {
-      ctx.reply("You have already updated day today!");
-    }
+    // "chat.id": chatId,
+  }).then(async (users) => {
+    if (!users) return;
+    users.forEach((user, index) => {
+      if (validateJCount(user.day_updated_at)) {
+        user.day = user.day + 1;
+        user.day_updated_at = moment().toDate();
+        user.save();
+        if(!users[index + 1]) ctx.reply(`${user.first_name} | Day${user.day}`);
+      } else {
+        if(!users[index + 1]) ctx.reply("You have already updated day today!");
+      }
+    });
     closeKeyboard(ctx);
   });
 });
 bot.action("resetDay", async (ctx) => {
   const userId = ctx.update.callback_query.from.id;
-  const chatId = ctx.update.callback_query.message?.chat.id;
-  await User.findOne({
+  // const chatId = ctx.update.callback_query.message?.chat.id;
+  await User.find({
     id: userId,
-    "chat.id": chatId,
-  }).then((obj) => {
-    if (!obj) return;
-    obj.day = 0;
-    obj.day_updated_at = moment().toDate();
-    obj.save();
-    ctx.reply(`${obj.first_name} | Day${obj.day}`);
+    // "chat.id": chatId,
+  }).then((users) => {
+    if (!users) return;
+    users.forEach((user, index) => {
+      user.day = 0;
+      user.day_updated_at = moment().toDate();
+      user.save();
+    });
+    ctx.reply(`${users[0].first_name} | Day${users[0].day}`);
   });
   closeKeyboard(ctx);
 });
@@ -154,9 +158,13 @@ bot.command("from", async (ctx) => {
   ctx.reply(fromNow(ctx.message.text.replace("/from", "").trim()));
 });
 bot.command("outlook", async (ctx) => {
-  axios.get('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc').then(function (response) {
-    ctx.reply(response.data.outlook);
-  })
+  axios
+    .get(
+      "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=flw&lang=tc"
+    )
+    .then(function (response) {
+      ctx.reply(response.data.outlook);
+    });
 });
 bot.hears(/\b(Gay)\b/i, (ctx) => ctx.reply("Gay there"));
 bot.hashtag("test", (ctx) => {
