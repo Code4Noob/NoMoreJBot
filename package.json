@@ -15,9 +15,11 @@
   "license": "ISC",
   "dependencies": {
     "axios": "1.2.0-alpha.1",
+    "dom-parser": "^1.1.5",
     "esbuild": "^0.15.18",
     "moment-timezone": "^0.5.39",
     "mongoose": "^6.8.0",
+    "sqlite3": "^5.1.7",
     "telegraf": "^4.11.2",
     "typegram": "^4.1.0",
     "uuid": "^9.0.0"
