@@ -11,6 +11,9 @@ importers:
       axios:
         specifier: 1.2.0-alpha.1
         version: 1.2.0-alpha.1
+      dayjs:
+        specifier: ^1.11.11
+        version: 1.11.11
       dom-parser:
         specifier: ^1.1.5
         version: 1.1.5
@@ -23,11 +26,14 @@ importers:
       mongoose:
         specifier: ^6.8.0
         version: 6.13.0(@aws-sdk/client-sso-oidc@3.600.0)
+      node-cron:
+        specifier: ^3.0.3
+        version: 3.0.3
       sqlite3:
         specifier: ^5.1.7
         version: 5.1.7
       telegraf:
-        specifier: ^4.11.2
+        specifier: ^4.16.3
         version: 4.16.3(encoding@0.1.13)
       typegram:
         specifier: ^4.1.0
@@ -39,6 +45,9 @@ importers:
       '@types/node':
         specifier: ^18.11.11
         version: 18.19.39
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
       '@types/uuid':
         specifier: ^9.0.0
         version: 9.0.8
@@ -381,6 +390,9 @@ packages:
     resolution: {integrity: sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==}
     engines: {node: '>= 6'}
 
+  '@types/node-cron@3.0.11':
+    resolution: {integrity: sha512-0ikrnug3/IyneSHqCBeslAhlK2aBfYek1fGo4bP4QnZPmiqSGRK+Oy7ZMisLWkesffJvQ1cqAcBnJC+8+nxIAg==}
+
   '@types/node@18.19.39':
     resolution: {integrity: sha512-nPwTRDKUctxw3di5b4TfT3I0sWDiWoPQCZjXhvdkINntwr8lcoVCKsTgnXeRubKIlfnV+eN/HYk6Jb40tbcEAQ==}
 
@@ -536,6 +548,9 @@ packages:
   date-fns@2.30.0:
     resolution: {integrity: sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==}
     engines: {node: '>=0.11'}
+
+  dayjs@1.11.11:
+    resolution: {integrity: sha512-okzr3f11N6WuqYtZSvm+F776mB41wRZMhKP+hc34YdW+KmtYYK9iqvHSwo2k9FEH3fhGXvOPV6yz2IcSrfRUDg==}
 
   debug@3.2.7:
     resolution: {integrity: sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ==}
@@ -1010,6 +1025,10 @@ packages:
     resolution: {integrity: sha512-mNcltoe1R8o7STTegSOHdnJNN7s5EUvhoS7ShnTHDyOSd+8H+UdWODq6qSv67PjC8Zc5JRT8+oLAMCr0SIXw7g==}
     engines: {node: ^16 || ^18 || >= 20}
 
+  node-cron@3.0.3:
+    resolution: {integrity: sha512-dOal67//nohNgYWb+nWmg5dkFdIwDm8EpeGYMekPMrngV3637lqnX0lbUcCtgibHTz6SEz7DAIjKvKDFYCnO1A==}
+    engines: {node: '>=6.0.0'}
+
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
     engines: {node: 4.x || >=6.0.0}
@@ -1292,6 +1311,10 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  uuid@8.3.2:
+    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    hasBin: true
 
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
@@ -2122,6 +2145,8 @@ snapshots:
   '@tootallnate/once@1.1.2':
     optional: true
 
+  '@types/node-cron@3.0.11': {}
+
   '@types/node@18.19.39':
     dependencies:
       undici-types: 5.26.5
@@ -2323,6 +2348,8 @@ snapshots:
   date-fns@2.30.0:
     dependencies:
       '@babel/runtime': 7.24.7
+
+  dayjs@1.11.11: {}
 
   debug@3.2.7(supports-color@5.5.0):
     dependencies:
@@ -2765,6 +2792,10 @@ snapshots:
 
   node-addon-api@7.1.0: {}
 
+  node-cron@3.0.3:
+    dependencies:
+      uuid: 8.3.2
+
   node-fetch@2.7.0(encoding@0.1.13):
     dependencies:
       whatwg-url: 5.0.0
@@ -3089,6 +3120,8 @@ snapshots:
     optional: true
 
   util-deprecate@1.0.2: {}
+
+  uuid@8.3.2: {}
 
   uuid@9.0.1: {}
 
