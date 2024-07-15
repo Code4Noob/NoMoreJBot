@@ -1,15 +1,15 @@
 import { Context, Input, Markup, Telegraf } from "telegraf";
-import { User, userSchema } from "./models/user";
-import { dbConnect, dbDisconnect } from "./db";
-import { from, validateJCount } from "./functions/date";
+import { User, userSchema } from "../models/user";
+import { dbConnect, dbDisconnect } from "../db";
+import { from, validateJCount } from "../functions/date";
 
 import { Update } from "typegram";
 import { message } from "telegraf/filters";
 import { v4 as uuidv4 } from "uuid";
 import cron from "node-cron";
-import hkdayjs from "./utils/dayjs";
-import { markSixReminder } from "./functions/marksix";
-import { weather } from "./functions/weather";
+import hkdayjs from "../utils/dayjs";
+import { markSixReminder } from "../functions/marksix";
+import { weather } from "../functions/weather";
 import axios from "axios";
 
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
@@ -163,20 +163,20 @@ bot.command("jp", async (ctx) => {
     await ctx.reply(message);
 });
 
-// const chatId = "gggggg";
+const chatId = "-1001862384479";
 
-// // Schedule the task to run every day at 10 AM
-// cron.schedule(
-//     "0 0 * * *",
-//     async () => {
-//         const message = await markSixReminder();
-//         bot.telegram.sendMessage(chatId, message);
-//     },
-//     {
-//         scheduled: true,
-//         timezone: "Asia/Hong_Kong", // Replace with your timezone
-//     }
-// );
+// Schedule the task to run every day at 10 AM
+cron.schedule(
+    "0 0 * * *",
+    async () => {
+        const message = await markSixReminder();
+        bot.telegram.sendMessage(chatId, message);
+    },
+    {
+        scheduled: true,
+        timezone: "Asia/Hong_Kong", // Replace with your timezone
+    }
+);
 
 bot.hears(/test/i, async (ctx) => {
     await ctx.reply(hkdayjs().format("DD/MM/YYYY HH:mm"));
