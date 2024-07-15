@@ -1,10 +1,9 @@
 import { Context, Input, Markup, Telegraf } from "telegraf";
-import { User, userSchema } from "../models/user";
+import { User } from "../models/user";
+import { Chat } from "../models/chat";
 import { dbConnect, dbDisconnect } from "../db";
 import { from, validateJCount } from "../functions/date";
 
-import { Update } from "typegram";
-import { message } from "telegraf/filters";
 import { v4 as uuidv4 } from "uuid";
 import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
@@ -25,19 +24,28 @@ const closeKeyboard = async (ctx: Context) => {
         reply_markup: { remove_keyboard: true },
     });
 };
-bot.start(async (ctx) => {
-    const res = await User.updateOne(
-        { id: ctx.message.from.id, "chat.id": ctx.chat.id },
+const initUser = async (ctx) => {
+    const chat = await Chat.findOneAndUpdate({ id: ctx.chat.id }, ctx.message.chat, {
+        upsert: true,
+        returnDocument: "after",
+    });
+    const user = await User.findOneAndUpdate(
+        { id: ctx.message.from.id },
         {
             ...ctx.message.from,
-            chat: ctx.message.chat,
+            $addToSet: { chat: chat._id },
             day: 0,
             day_updated_at: null,
         },
         {
             upsert: true,
+            returnDocument: "after",
         }
     );
+    return user;
+};
+bot.start(async (ctx) => {
+    await initUser(ctx);
     await ctx.reply("Hello " + ctx.from.first_name + "!");
 });
 bot.help(async (ctx) => {
@@ -75,66 +83,64 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
 bot.action("updateDay", async (ctx) => {
     const userId = ctx.update.callback_query.from.id;
     // const chatId = ctx.update.callback_query.message?.chat.id;
-    await User.find({
+    let user = await User.findOne({
         id: userId,
         // "chat.id": chatId,
-    }).then(async (users) => {
-        if (!users) return;
-        users.map(async (user, index) => {
-            if (validateJCount(user.day_updated_at)) {
-                user.day = user.day + 1;
-                user.day_updated_at = hkdayjs();
-                user.save();
-                if (!users[index + 1]) await ctx.reply(`${user.first_name} | Day${user.day}`);
-            } else {
-                if (!users[index + 1]) await ctx.reply("你今日咪撳撚左囉，仲撳多次做乜柒姐?");
-            }
-        });
-        closeKeyboard(ctx);
     });
+    if (!user) user = await initUser(ctx);
+    if (validateJCount(user.day_updated_at)) {
+        user.day = user.day + 1;
+        user.day_updated_at = hkdayjs();
+        user.save();
+        await ctx.reply(`${user.first_name} | Day${user.day}`);
+    } else {
+        await ctx.reply("你今日咪撳撚左囉，仲撳多次做乜柒姐?");
+    }
+    closeKeyboard(ctx);
 });
 bot.action("resetDay", async (ctx) => {
     const userId = ctx.update.callback_query.from.id;
     // const chatId = ctx.update.callback_query.message?.chat.id;
-    await User.find({
+    let user = await User.find({
         id: userId,
         // "chat.id": chatId,
-    }).then(async (users) => {
-        if (!users) return;
-        users.map(async (user, index) => {
-            user.day = 0;
-            user.day_updated_at = hkdayjs();
-            user.save();
-        });
-        await ctx.reply(`${users[0].first_name} | Day${users[0].day}`);
     });
+
+    if (!user) user = await initUser(ctx);
+    user.day = 0;
+    user.day_updated_at = hkdayjs();
+    user.save();
+    await ctx.reply(`${user.first_name} | Day${user.day}`);
     closeKeyboard(ctx);
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.command("users", async (ctx) => {
-    // TODO: await, type
+    const chat = await Chat.findOne({ id: ctx.chat.id });
+    if (!chat) {
+        await initUser(ctx);
+        return;
+    }
     const medal = ["🥇", "🥈", "🥉"];
     const shit = "💩";
     let usersMsg = `${ctx.message.chat.title}\n`;
-    // TODO: should not use clone?
-    await User.find(
-        { "chat.id": ctx.message.chat.id },
-        async function (err: Error, docs: (typeof User)[]) {
-            docs.sort((a, b) => b.day - a.day).forEach((user, index) => {
-                let emoji = medal[index] ?? shit;
-                usersMsg += `${emoji} Day${user.day} | ${user.first_name}\n`;
-            });
-            await ctx.reply(usersMsg);
-        }
-    ).clone();
+    const users = await User.find({ chat: { $in: chat._id } });
+    users
+        .sort((a, b) => b.day - a.day)
+        .forEach((user, index) => {
+            let emoji = medal[index] ?? shit;
+            usersMsg += `${emoji} Day${user.day} | ${user.first_name}\n`;
+        });
+    await ctx.reply(usersMsg);
 });
 bot.command("me", async (ctx) => {
-    await User.findOne({
+    const user = await User.findOne({
         id: ctx.message.from.id,
-        "chat.id": ctx.chat.id,
-    }).then(async (obj) => {
-        if (obj) await ctx.reply(`${obj.first_name} | Day${obj.day}`);
     });
+    if (user) {
+        await ctx.reply(`${user.first_name} | Day${user.day}`);
+    } else {
+        initUser(ctx);
+    }
 });
 
 bot.command("from", async (ctx) => {
