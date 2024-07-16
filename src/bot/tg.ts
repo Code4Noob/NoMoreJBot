@@ -101,11 +101,10 @@ bot.action("updateDay", async (ctx) => {
 bot.action("resetDay", async (ctx) => {
     const userId = ctx.update.callback_query.from.id;
     // const chatId = ctx.update.callback_query.message?.chat.id;
-    let user = await User.find({
+    let user = await User.findOne({
         id: userId,
         // "chat.id": chatId,
     });
-
     if (!user) user = await initUser(ctx);
     user.day = 0;
     user.day_updated_at = hkdayjs();
