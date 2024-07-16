@@ -19,11 +19,34 @@ try {
     console.log(error);
 }
 
-const closeKeyboard = async (ctx: Context) => {
-    await ctx.editMessageReplyMarkup({
-        reply_markup: { remove_keyboard: true },
+bot.hears(/gg/i, (ctx) => {
+    ctx.reply("Seu bot é feito em?", {
+        parse_mode: "HTML",
+        reply_markup: {
+            inline_keyboard: [
+                [
+                    {
+                        text: "Manybot/Chatfuel/Outros do tipo.",
+                        callback_data: "join:falid",
+                    },
+                ],
+                [
+                    {
+                        text: "Uma liguagem de programação.",
+                        callback_data: "join:programig",
+                    },
+                ],
+                [
+                    {
+                        text: "Ainda não tenho um bot.",
+                        callback_data: "join:nda",
+                    },
+                ],
+            ],
+        },
     });
-};
+    ctx.replyWithDice();
+});
 const initUser = async (ctx) => {
     const chat = await Chat.findOneAndUpdate({ id: ctx.chat.id }, ctx.message.chat, {
         upsert: true,
@@ -64,7 +87,7 @@ bot.command("quit", async (ctx) => {
     }
 });
 bot.command("j", async (ctx) => {
-    ctx.reply(
+    await ctx.reply(
         "Jed?",
         Markup.inlineKeyboard([
             Markup.button.callback("Yes", "resetDay"),
@@ -72,6 +95,7 @@ bot.command("j", async (ctx) => {
         ])
     );
 });
+bot.command("c", async (ctx) => {});
 bot.command("picture", async (ctx) => {
     await ctx.replyWithPhoto(Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`));
 });
@@ -96,7 +120,7 @@ bot.action("updateDay", async (ctx) => {
     } else {
         await ctx.reply("你今日咪撳撚左囉，仲撳多次做乜柒姐?");
     }
-    closeKeyboard(ctx);
+    await ctx.editMessageReplyMarkup(undefined);
 });
 bot.action("resetDay", async (ctx) => {
     const userId = ctx.update.callback_query.from.id;
@@ -110,7 +134,7 @@ bot.action("resetDay", async (ctx) => {
     user.day_updated_at = hkdayjs();
     user.save();
     await ctx.reply(`${user.first_name} | Day${user.day}`);
-    closeKeyboard(ctx);
+    await ctx.editMessageReplyMarkup(undefined);
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.command("users", async (ctx) => {
