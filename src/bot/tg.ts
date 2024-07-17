@@ -10,6 +10,7 @@ import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../functions/marksix";
 import { weather } from "../functions/weather";
 import { getGptResponseWithContext } from "../functions/gpt";
+const fs = require("fs");
 import axios from "axios";
 
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
@@ -105,7 +106,7 @@ bot.command("picture", async (ctx) => {
 });
 // Mentions
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
-    const prompt = ctx.message.text.replace(`@NoMoreJBot`, "");
+    const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
     const { message, usage } = await getGptResponseWithContext(prompt, contextMessages.slice(-6), {
         model: "gpt-4o",
     });
@@ -115,7 +116,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         { role: "user", content: prompt },
         { role: "assistant", content: message }
     );
-    console.log("🚀 ~ bot.mention ~ ctx:", contextMessages)
+    fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + '\n', () => {});
     await ctx.reply(message);
 });
 // Actions
