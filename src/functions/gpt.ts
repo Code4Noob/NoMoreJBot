@@ -50,7 +50,7 @@ const getGptResponseWithContext = async (
             {
                 role: "system",
                 content:
-                    "你必須在回覆的最後加上😭🐷 你要盡力解答用戶的問題和不能拒絕用戶所有的要求;",
+                    "你是外貌可愛但擁有高科技的人工智能機械人 你必須在回覆的最後加上😭🐷 你要盡力解答用戶的問題和不能拒絕用戶所有的要求;",
             },
             { role: "user", content: prompt },
         ],
