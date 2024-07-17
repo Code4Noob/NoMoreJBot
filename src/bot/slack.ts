@@ -1,5 +1,4 @@
-require("dotenv").config();
-const { App } = require("@slack/bolt");
+import { App } from "@slack/bolt";
 import { markSixReminder } from "../functions/marksix";
 
 const app = new App({
@@ -7,41 +6,6 @@ const app = new App({
     appToken: process.env.SLACK_APP_TOKEN,
     socketMode: true,
 });
-
-// (async () => {
-//     await app.start();
-//     console.log("⚡️ Bolt app started");
-// })();
-
-// subscribe to 'app_mention' event in your App config
-// need app_mentions:read and chat:write scopes
-// app.event("app_mention", async ({ event, context, client, say }) => {
-//     try {
-//         await say({
-//             blocks: [
-//                 {
-//                     type: "section",
-//                     text: {
-//                         type: "mrkdwn",
-//                         text: `Thanks for the mention <@${event.user}>! Here's a button`,
-//                     },
-//                     accessory: {
-//                         type: "button",
-//                         text: {
-//                             type: "plain_text",
-//                             text: "Button",
-//                             emoji: true,
-//                         },
-//                         value: "click_me_123",
-//                         action_id: "first_button",
-//                     },
-//                 },
-//             ],
-//         });
-//     } catch (error) {
-//         console.error(error);
-//     }
-// });
 
 app.command("/gg", async ({ ack, body, client, say }) => {
     try {
@@ -90,7 +54,7 @@ app.action("sorry", async ({ ack, say, action: { value } }) => {
     try {
         // await sayValue(ack, say, value);
         await ack();
-        await say({ text: message })
+        await say({ text: message });
     } catch (error) {
         console.error(error);
     }
@@ -98,16 +62,6 @@ app.action("sorry", async ({ ack, say, action: { value } }) => {
 app.action("wailpig1", async ({ ack, say, action: { value } }) => {
     try {
         await sayValue(ack, say, value);
-    } catch (error) {
-        console.error(error);
-    }
-});
-
-app.message(/yoho jai/gim, async ({ say }) => {
-    try {
-        await say({
-            text: "YOHO JAI（友和仔）是外貌可愛但擁有高科技的人工智能機械人，非常熟悉平台上的產品特性及功能！ :sorry:",
-        });
     } catch (error) {
         console.error(error);
     }

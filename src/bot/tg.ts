@@ -9,9 +9,13 @@ import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../functions/marksix";
 import { weather } from "../functions/weather";
+import { getGptResponseWithContext } from "../functions/gpt";
 import axios from "axios";
 
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
+
+const contextMessages = [];
+const imContextMessages = {};
 
 try {
     dbConnect();
@@ -101,7 +105,18 @@ bot.command("picture", async (ctx) => {
 });
 // Mentions
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
-    ctx.reply("🤡");
+    const prompt = ctx.message.text.replace(`@NoMoreJBot`, "");
+    const { message, usage } = await getGptResponseWithContext(prompt, contextMessages.slice(-6), {
+        model: "gpt-4o",
+    });
+    console.log("🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:", usage)
+    // TODO: Limited size of contextMessages
+    contextMessages.push(
+        { role: "user", content: prompt },
+        { role: "assistant", content: message }
+    );
+    console.log("🚀 ~ bot.mention ~ ctx:", contextMessages)
+    await ctx.reply(message);
 });
 // Actions
 bot.action("updateDay", async (ctx) => {
