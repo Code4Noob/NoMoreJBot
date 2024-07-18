@@ -117,7 +117,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         { role: "assistant", content: message }
     );
     fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + '\n', () => {});
-    await ctx.reply(message);
+    await ctx.reply(`${message}😭🐷`);
 });
 // Actions
 bot.action("updateDay", async (ctx) => {
