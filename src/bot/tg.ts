@@ -24,34 +24,6 @@ try {
     console.log(error);
 }
 
-bot.hears(/gg/i, (ctx) => {
-    ctx.reply("Seu bot é feito em?", {
-        parse_mode: "HTML",
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    {
-                        text: "Manybot/Chatfuel/Outros do tipo.",
-                        callback_data: "join:falid",
-                    },
-                ],
-                [
-                    {
-                        text: "Uma liguagem de programação.",
-                        callback_data: "join:programig",
-                    },
-                ],
-                [
-                    {
-                        text: "Ainda não tenho um bot.",
-                        callback_data: "join:nda",
-                    },
-                ],
-            ],
-        },
-    });
-    ctx.replyWithDice();
-});
 const initUser = async (ctx) => {
     const chat = await Chat.findOneAndUpdate({ id: ctx.chat.id }, ctx.message.chat, {
         upsert: true,
@@ -100,7 +72,6 @@ bot.command("j", async (ctx) => {
         ])
     );
 });
-bot.command("c", async (ctx) => {});
 bot.command("picture", async (ctx) => {
     await ctx.replyWithPhoto(Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`));
 });
@@ -110,13 +81,13 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
     const { message, usage } = await getGptResponseWithContext(prompt, contextMessages.slice(-6), {
         model: "gpt-4o",
     });
-    console.log("🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:", usage)
+    console.log("🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:", usage);
     // TODO: Limited size of contextMessages
     contextMessages.push(
         { role: "user", content: prompt },
         { role: "assistant", content: message }
     );
-    fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + '\n', () => {});
+    fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + "\n", () => {});
     await ctx.reply(`${message}😭🐷`);
 });
 // Actions
@@ -132,9 +103,9 @@ bot.action("updateDay", async (ctx) => {
         user.day = user.day + 1;
         user.day_updated_at = hkdayjs();
         user.save();
-        await ctx.reply(`${user.first_name} | Day${user.day}`);
+        await ctx.reply(`${user.first_name} | Day${user.day}`, Markup.removeKeyboard());
     } else {
-        await ctx.reply("你今日咪撳撚左囉，仲撳多次做乜柒姐?");
+        await ctx.reply("你今日咪撳撚左囉，仲撳多次做乜柒姐?", Markup.removeKeyboard());
     }
     await ctx.editMessageReplyMarkup(undefined);
 });
@@ -149,7 +120,7 @@ bot.action("resetDay", async (ctx) => {
     user.day = 0;
     user.day_updated_at = hkdayjs();
     user.save();
-    await ctx.reply(`${user.first_name} | Day${user.day}`);
+    await ctx.reply(`${user.first_name} | Day${user.day}`, Markup.removeKeyboard());
     await ctx.editMessageReplyMarkup(undefined);
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
