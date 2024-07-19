@@ -16,7 +16,6 @@ import axios from "axios";
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
 
 const contextMessages = [];
-const imContextMessages = {};
 
 try {
     dbConnect();
@@ -77,18 +76,23 @@ bot.command("picture", async (ctx) => {
 });
 // Mentions
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
-    const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
-    const { message, usage } = await getGptResponseWithContext(prompt, contextMessages.slice(-6), {
-        model: "gpt-4o",
-    });
-    console.log("🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:", usage);
-    // TODO: Limited size of contextMessages
-    contextMessages.push(
-        { role: "user", content: prompt },
-        { role: "assistant", content: message }
-    );
-    fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + "\n", () => {});
-    await ctx.reply(`${message}😭🐷`);
+    try{
+        const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
+        const { message, usage } = await getGptResponseWithContext(prompt, contextMessages.slice(-6), {
+            model: "gpt-4o",
+        });
+        console.log("🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:", usage);
+        // TODO: Limited size of contextMessages
+        contextMessages.push(
+            { role: "user", content: prompt },
+            { role: "assistant", content: message }
+        );
+        fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + "\n", () => {});
+        await ctx.reply(`${message}😭🐷`);
+    }catch(error){
+        console.log("🚀 ~ bot.mention ~ error:", error)
+        await ctx.reply(`${error.response.data.error.message} 😭🐷`);
+    }
 });
 // Actions
 bot.action("updateDay", async (ctx) => {
