@@ -10,6 +10,7 @@ import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../functions/marksix";
 import { weather } from "../functions/weather";
 import { getGptResponseWithContext } from "../functions/gpt";
+import { getResponseWithContext } from "../functions/llama";
 const fs = require("fs");
 import axios from "axios";
 
@@ -24,10 +25,14 @@ try {
 }
 
 const initUser = async (ctx) => {
-    const chat = await Chat.findOneAndUpdate({ id: ctx.chat.id }, ctx.message.chat, {
-        upsert: true,
-        returnDocument: "after",
-    });
+    const chat = await Chat.findOneAndUpdate(
+        { id: ctx.chat.id },
+        ctx.message.chat,
+        {
+            upsert: true,
+            returnDocument: "after",
+        }
+    );
     const user = await User.findOneAndUpdate(
         { id: ctx.message.from.id },
         {
@@ -72,25 +77,38 @@ bot.command("j", async (ctx) => {
     );
 });
 bot.command("picture", async (ctx) => {
-    await ctx.replyWithPhoto(Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`));
+    await ctx.replyWithPhoto(
+        Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`)
+    );
 });
 // Mentions
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
-    try{
+    try {
         const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
-        const { message, usage } = await getGptResponseWithContext(prompt, contextMessages.slice(-6), {
-            model: "gpt-4o",
-        });
-        console.log("🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:", usage);
+        const { message, usage } = await getGptResponseWithContext(
+            prompt,
+            contextMessages.slice(-6),
+            {
+                model: "gpt-4o",
+            }
+        );
+        console.log(
+            "🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:",
+            usage
+        );
         // TODO: Limited size of contextMessages
         contextMessages.push(
             { role: "user", content: prompt },
             { role: "assistant", content: message }
         );
-        fs.appendFile("log.log", JSON.stringify({ prompt, message, usage }) + "\n", () => {});
+        fs.appendFile(
+            "log.log",
+            JSON.stringify({ prompt, message, usage }) + "\n",
+            () => {}
+        );
         await ctx.reply(`${message}😭🐷`);
-    }catch(error){
-        console.log("🚀 ~ bot.mention ~ error:", error)
+    } catch (error) {
+        console.log("🚀 ~ bot.mention ~ error:", error);
         await ctx.reply(`${error.response.data.error.message} 😭🐷`);
     }
 });
@@ -107,9 +125,15 @@ bot.action("updateDay", async (ctx) => {
         user.day = user.day + 1;
         user.day_updated_at = hkdayjs();
         user.save();
-        await ctx.reply(`${user.first_name} | Day${user.day}`, Markup.removeKeyboard());
+        await ctx.reply(
+            `${user.first_name} | Day${user.day}`,
+            Markup.removeKeyboard()
+        );
     } else {
-        await ctx.reply("你今日咪撳撚左囉，仲撳多次做乜柒姐?", Markup.removeKeyboard());
+        await ctx.reply(
+            "你今日咪撳撚左囉，仲撳多次做乜柒姐?",
+            Markup.removeKeyboard()
+        );
     }
     await ctx.editMessageReplyMarkup(undefined);
 });
@@ -124,7 +148,10 @@ bot.action("resetDay", async (ctx) => {
     user.day = 0;
     user.day_updated_at = hkdayjs();
     user.save();
-    await ctx.reply(`${user.first_name} | Day${user.day}`, Markup.removeKeyboard());
+    await ctx.reply(
+        `${user.first_name} | Day${user.day}`,
+        Markup.removeKeyboard()
+    );
     await ctx.editMessageReplyMarkup(undefined);
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
@@ -170,6 +197,16 @@ bot.command("weather", async (ctx) => {
 bot.command("marksix", async (ctx) => {
     const message = await markSixReminder();
     await ctx.reply(message);
+});
+
+bot.command("llama", async (ctx) => {
+    const prompt = ctx.payload.trim();
+    const response = await getResponseWithContext(
+        prompt,
+        contextMessages.slice(-6),
+        {}
+    );
+    await ctx.reply(response.message);
 });
 
 bot.command("jp", async (ctx) => {
