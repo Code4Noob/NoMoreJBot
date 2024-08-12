@@ -1,6 +1,6 @@
 start - start
 help - help
-keyboard - keyboard
+llama - llama
 quit - quit
 picture - picture
 marksix - marksix
