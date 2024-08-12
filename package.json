@@ -17,7 +17,6 @@
     "@slack/bolt": "^3.19.0",
     "axios": "1.2.0-alpha.1",
     "dayjs": "^1.11.11",
-    "dom-parser": "^1.1.5",
     "esbuild": "^0.15.18",
     "moment-timezone": "^0.5.39",
     "mongoose": "^6.8.0",
