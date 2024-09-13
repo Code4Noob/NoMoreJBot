@@ -15,16 +15,22 @@ const markSixReminder = async () => {
         const { lotteryDraws } = data.data;
         const {
             closeDate,
-            lotteryPool: { estimatedPrize, jackpot, derivedFirstPrizeDiv },
+            lotteryPool: {
+                estimatedPrize,
+                jackpot,
+                derivedFirstPrizeDiv,
+                totalInvestment,
+            },
         } = lotteryDraws.pop();
-        const firstPrize = estimatedPrize || derivedFirstPrizeDiv;
-        const over100Million = firstPrize >= 100000000 ? "!! 頭獎超過一億 !!\n" : "";
-        return `${over100Million}${hkdayjs(closeDate).format(
-            "DD/MM/YYYY"
+        const firstPrize = Number(estimatedPrize || derivedFirstPrizeDiv);
+        const over100Million =
+            firstPrize >= 100000000 ? "!! 頭獎超過一億 !!\n" : "";
+        return `攪珠日期: ${over100Million}${hkdayjs(closeDate).format(
+            "DD/MM/YYYY(ddd)"
         )}\n多寶 / 金多寶: ${Number(
             jackpot
-        ).toLocaleString()}\n估計頭獎基金: ${Number(
-            firstPrize
+        ).toLocaleString()}\n估計頭獎基金: ${firstPrize.toLocaleString()}\n投注額: ${Number(
+            totalInvestment
         ).toLocaleString()}`;
     } catch (error) {
         console.log(error);
