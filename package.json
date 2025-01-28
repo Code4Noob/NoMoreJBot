@@ -16,6 +16,7 @@
   "dependencies": {
     "@slack/bolt": "^3.19.0",
     "axios": "1.2.0-alpha.1",
+    "cheerio": "^1.0.0",
     "dayjs": "^1.11.11",
     "esbuild": "^0.15.18",
     "moment-timezone": "^0.5.39",

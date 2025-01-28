@@ -9,14 +9,14 @@ import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../functions/marksix";
 import { weather } from "../functions/weather";
-import { getGptResponseWithContext } from "../functions/gpt";
+import { getGptResponse, functionHandlers, toolList } from "../functions/gpt";
 import { getResponseWithContext } from "../functions/llama";
 const fs = require("fs");
 import axios from "axios";
 
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
 
-const contextMessages = [];
+let contextChat = [];
 
 try {
     dbConnect();
@@ -53,7 +53,6 @@ bot.start(async (ctx) => {
     await ctx.reply("Hello " + ctx.from.first_name + "!");
 });
 bot.help(async (ctx) => {
-    console.log("🚀 ~ bot.help ~ ctx:", ctx);
     await ctx.reply("Nothing to help");
 });
 
@@ -85,28 +84,55 @@ bot.command("picture", async (ctx) => {
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
     try {
         const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
-        const { message, usage } = await getGptResponseWithContext(
-            prompt,
-            contextMessages.slice(-6),
-            {
-                model: "gpt-4o",
-            }
-        );
-        console.log(
-            "🚀 ~ const{message,usage}=awaitgetGptResponseWithContext ~ usage:",
-            usage
-        );
+        let contextMessages = [];
         // TODO: Limited size of contextMessages
-        contextMessages.push(
-            { role: "user", content: prompt },
-            { role: "assistant", content: message }
-        );
+        contextMessages.push({ role: "user", content: prompt });
+        contextChat.push({ role: "user", content: prompt });
+
+        let {
+            message: reply,
+            usage,
+            toolCalls,
+        } = await getGptResponse({
+            messages: contextChat.slice(-6),
+        });
+
+        // Handle model function call if any
+        if (toolCalls) {
+            contextMessages.push({
+                role: "assistant",
+                content: null,
+                tool_calls: toolCalls,
+            });
+            await Promise.all(
+                toolCalls.map(async (toolCall) => {
+                    const { name, arguments: args } = toolCall.function;
+                    const handler = functionHandlers[name];
+                    const functionResult = await handler(JSON.parse(args));
+                    contextMessages.push({
+                        name,
+                        role: "tool",
+                        content: JSON.stringify(functionResult),
+                        tool_call_id: toolCall.id,
+                    });
+                })
+            );
+            const gptResponse = await getGptResponse({
+                messages: contextMessages,
+            });
+            reply = gptResponse.message;
+            usage += gptResponse.usage;
+        }
+
         fs.appendFile(
             "log.log",
-            JSON.stringify({ prompt, message, usage }) + "\n",
+            JSON.stringify({ prompt, reply, usage }) + "\n",
             () => {}
         );
-        await ctx.reply(`${message}😭🐷`);
+        if (reply) {
+            contextChat.push({ role: "assistant", content: reply });
+        }
+        await ctx.reply(`${reply}😭🐷`);
     } catch (error) {
         console.log("🚀 ~ bot.mention ~ error:", error);
         await ctx.reply(`${error.response.data.error.message} 😭🐷`);
@@ -185,7 +211,6 @@ bot.command("me", async (ctx) => {
 });
 
 bot.command("from", async (ctx) => {
-    console.log("🚀 ~ bot.command ~ ctx:", ctx);
     await ctx.reply(from(ctx.payload.trim()));
 });
 
