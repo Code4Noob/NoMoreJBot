@@ -14,27 +14,27 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@slack/bolt": "^3.19.0",
+    "@slack/bolt": "^3.22.0",
     "axios": "1.2.0-alpha.1",
     "cheerio": "^1.0.0",
-    "dayjs": "^1.11.11",
+    "dayjs": "^1.11.13",
     "esbuild": "^0.15.18",
-    "moment-timezone": "^0.5.39",
-    "mongoose": "^6.8.0",
+    "moment-timezone": "^0.5.47",
+    "mongoose": "^6.13.8",
     "node-cron": "^3.0.3",
     "sqlite3": "^5.1.7",
     "telegraf": "^4.16.3",
     "ts-node": "^10.9.2",
-    "typegram": "^4.1.0",
-    "uuid": "^9.0.0"
+    "typegram": "^4.3.0",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/node": "^18.11.11",
+    "@types/node": "^18.19.75",
     "@types/node-cron": "^3.0.11",
-    "@types/uuid": "^9.0.0",
+    "@types/uuid": "^9.0.8",
     "concurrently": "^7.6.0",
-    "dotenv": "^16.0.3",
-    "nodemon": "^2.0.20",
-    "typescript": "^4.9.3"
+    "dotenv": "^16.4.7",
+    "nodemon": "^2.0.22",
+    "typescript": "^4.9.5"
   }
 }
