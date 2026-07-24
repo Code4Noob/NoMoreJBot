@@ -84,10 +84,12 @@ bot.command("picture", async (ctx) => {
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
     try {
         const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
+        const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
+        const userMessage = `[${userName}]: ${prompt}`;
         let contextMessages = [];
         // TODO: Limited size of contextMessages
-        contextMessages.push({ role: "user", content: prompt });
-        contextChat.push({ role: "user", content: prompt });
+        contextMessages.push({ role: "user", content: userMessage });
+        contextChat.push({ role: "user", content: userMessage });
 
         let {
             message: reply,
