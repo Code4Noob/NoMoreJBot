@@ -4,3 +4,4 @@ llama - llama
 quit - quit
 picture - picture
 marksix - marksix
+draw - draw

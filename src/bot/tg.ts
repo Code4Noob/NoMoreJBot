@@ -9,7 +9,7 @@ import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../functions/marksix";
 import { weather } from "../functions/weather";
-import { getGeminiResponse, functionHandlers } from "../functions/gemini";
+import { getGeminiResponse, getGeminiImage, functionHandlers } from "../functions/gemini";
 import { getResponseWithContext } from "../functions/llama";
 const fs = require("fs");
 import axios from "axios";
@@ -253,6 +253,30 @@ bot.command("jp", async (ctx) => {
         .map((x) => x.join(": "))
         .join("\n");
     await ctx.reply(message);
+});
+
+bot.command("draw", async (ctx) => {
+    const prompt = ctx.payload.trim();
+    if (!prompt) {
+        await ctx.reply("畫咩撚嘢？俾個描述嚟先😭🐷");
+        return;
+    }
+    try {
+        await ctx.reply("畫緊...😭🐷");
+        const { text, imageData } = await getGeminiImage({ prompt });
+        if (imageData) {
+            const buffer = Buffer.from(imageData.data, "base64");
+            await ctx.replyWithPhoto(
+                { source: buffer },
+                { caption: text ? `${text}😭🐷` : "😭🐷" }
+            );
+        } else {
+            await ctx.reply(text ? `${text}😭🐷` : "畫唔到😭🐷");
+        }
+    } catch (error: any) {
+        console.log("🚀 ~ bot.command draw ~ error:", error);
+        await ctx.reply(`畫唔到: ${error?.response?.data?.error?.message || error.message} 😭🐷`);
+    }
 });
 
 const chatId = "-1001862384479";

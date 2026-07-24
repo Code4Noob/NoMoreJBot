@@ -16,6 +16,7 @@ interface GeminiResponse {
     message: string | null;
     toolCalls: ToolCall[] | undefined;
     usage: number;
+    imageData?: { mimeType: string; data: string } | null;
 }
 
 function convertToGeminiMessages(messages: any[]): any[] {
@@ -156,7 +157,7 @@ export async function getGeminiResponse({
         const candidate = data.candidates?.[0];
         if (!candidate) {
             console.log("🚀 ~ getGeminiResponse ~ no candidate:", JSON.stringify(data));
-            return { message: "No response from Gemini", toolCalls: undefined, usage: 0 };
+            return { message: "No response from Gemini", toolCalls: undefined, usage: 0, imageData: null };
         }
 
         const totalTokens = data.usageMetadata?.totalTokenCount ?? 0;
@@ -165,11 +166,12 @@ export async function getGeminiResponse({
         console.log("🚀 ~ getGeminiResponse ~ finishReason:", candidate.finishReason, "parts:", parts.length, JSON.stringify(parts).slice(0, 500));
 
         if (parts.length === 0) {
-            return { message: null, toolCalls: undefined, usage: totalTokens };
+            return { message: null, toolCalls: undefined, usage: totalTokens, imageData: null };
         }
 
         const toolCalls: ToolCall[] = [];
         let textParts: string[] = [];
+        let imageData: { mimeType: string; data: string } | null = null;
 
         for (const part of parts) {
             if (part.functionCall) {
@@ -185,6 +187,12 @@ export async function getGeminiResponse({
             if (part.text) {
                 textParts.push(part.text);
             }
+            if (part.inlineData && part.inlineData.mimeType?.startsWith("image/")) {
+                imageData = {
+                    mimeType: part.inlineData.mimeType,
+                    data: part.inlineData.data,
+                };
+            }
         }
 
         const message = textParts.length > 0 ? textParts.join("\n") : null;
@@ -193,9 +201,62 @@ export async function getGeminiResponse({
             message,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
             usage: totalTokens,
+            imageData,
         };
     } catch (error: any) {
         console.log("🚀 ~ getGeminiResponse ~ error:", error?.response?.data || error.message);
+        throw error;
+    }
+}
+
+export async function getGeminiImage({
+    prompt,
+}: {
+    prompt: string;
+}): Promise<{ text: string | null; imageData: { mimeType: string; data: string } | null }> {
+    const IMAGE_MODEL = "gemini-3.1-flash-image";
+
+    const requestBody: any = {
+        contents: [
+            {
+                role: "user",
+                parts: [{ text: prompt }],
+            },
+        ],
+        generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+        },
+    };
+
+    try {
+        const { data } = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+            requestBody
+        );
+
+        const candidate = data.candidates?.[0];
+        if (!candidate) {
+            console.log("🚀 ~ getGeminiImage ~ no candidate:", JSON.stringify(data));
+            return { text: null, imageData: null };
+        }
+
+        const parts = candidate.content?.parts ?? [];
+        let text = "";
+        let imageData: { mimeType: string; data: string } | null = null;
+
+        for (const part of parts) {
+            if (part.text) text += part.text + "\n";
+            if (part.inlineData && part.inlineData.mimeType?.startsWith("image/")) {
+                imageData = {
+                    mimeType: part.inlineData.mimeType,
+                    data: part.inlineData.data,
+                };
+            }
+        }
+
+        return { text: text.trim() || null, imageData };
+    } catch (error: any) {
+        console.log("🚀 ~ getGeminiImage ~ error:", error?.response?.data || error.message);
         throw error;
     }
 }
