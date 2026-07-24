@@ -24,7 +24,7 @@ build({
   bundle: true,
   platform: "node",
   target: "esnext",
-  // external: ['@babel/core', '@babel/types'].concat(Object.keys(dependencies)),
+  external: ['undici', 'node-fetch'],
 
   loader: { ".ts": "ts" },
   watch: args.watch,

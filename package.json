@@ -19,6 +19,7 @@
     "cheerio": "^1.0.0",
     "dayjs": "^1.11.13",
     "esbuild": "^0.15.18",
+    "esbuild-linux-64": "^0.15.18",
     "moment-timezone": "^0.5.47",
     "mongoose": "^6.13.8",
     "node-cron": "^3.0.3",

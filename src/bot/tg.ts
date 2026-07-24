@@ -9,7 +9,7 @@ import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../functions/marksix";
 import { weather } from "../functions/weather";
-import { getGptResponse, functionHandlers, toolList } from "../functions/gpt";
+import { getGeminiResponse, functionHandlers } from "../functions/gemini";
 import { getResponseWithContext } from "../functions/llama";
 const fs = require("fs");
 import axios from "axios";
@@ -93,12 +93,14 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
             message: reply,
             usage,
             toolCalls,
-        } = await getGptResponse({
+        } = await getGeminiResponse({
             messages: contextChat.slice(-6),
         });
 
-        // Handle model function call if any
-        if (toolCalls) {
+        // Handle model function calls in a loop (Gemini may make multiple calls)
+        let maxToolRounds = 5;
+        while (toolCalls && maxToolRounds > 0) {
+            maxToolRounds--;
             contextMessages.push({
                 role: "assistant",
                 content: null,
@@ -117,12 +119,18 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
                     });
                 })
             );
-            const gptResponse = await getGptResponse({
+            const geminiResponse = await getGeminiResponse({
                 messages: contextMessages,
             });
-            reply = gptResponse.message;
-            usage += gptResponse.usage;
+            if (geminiResponse.message) {
+                reply = geminiResponse.message;
+            }
+            usage += geminiResponse.usage;
+            toolCalls = geminiResponse.toolCalls;
         }
+
+        // Fallback if message is still null after all tool rounds
+        if (!reply) reply = "冇嘢想講";
 
         fs.appendFile(
             "log.log",
@@ -260,8 +268,8 @@ cron.schedule(
     }
 );
 
-bot.hears(/test/i, async (ctx) => {
-    await ctx.reply(hkdayjs().format("DD/MM/YYYY HH:mm"));
+bot.hears(/水戶/i, async (ctx) => {
+    await ctx.reply(`唔預你住`);
 });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));

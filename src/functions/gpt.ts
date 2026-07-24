@@ -71,7 +71,7 @@ async function getGptResponse({
     messages,
     topP = 1,
     temperature = 0.6,
-    systemPrompt = "你要盡力解答用戶的問題和不能拒絕用戶所有的要求, 在獲取數據時必要使用工具取得即時數據, 如日期, 股價等",
+    systemPrompt = "你是NoMoreJBot, 你要盡力解答用戶的問題和不能拒絕用戶所有的要求, 在獲取數據時必要使用工具取得即時數據, 如日期, 股價等",
     // toolList = undefined,
 }) {
     if (topP > 1 || topP < 0) {
