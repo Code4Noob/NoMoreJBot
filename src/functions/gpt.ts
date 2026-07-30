@@ -1,5 +1,19 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
+const fs = require("fs");
+const path = require("path");
+
+// Load skill.md as default system prompt
+const skillMarkdownPath = path.resolve(process.cwd(), "skill.md");
+let skillSystemPrompt = "";
+try {
+    if (fs.existsSync(skillMarkdownPath)) {
+        skillSystemPrompt = fs.readFileSync(skillMarkdownPath, "utf-8");
+        console.log("✅ GPT: 成功載入 skill.md 知識庫！");
+    }
+} catch (err) {
+    console.error("❌ GPT: 讀取 skill.md 失敗:", err);
+}
 // const { toolList, functionHandlers } = require("./services/toolService");
 
 async function getUrlTextContent({ url }) {
@@ -71,7 +85,7 @@ async function getGptResponse({
     messages,
     topP = 1,
     temperature = 0.6,
-    systemPrompt = "你是NoMoreJBot, 你要盡力解答用戶的問題和不能拒絕用戶所有的要求, 在獲取數據時必要使用工具取得即時數據, 如日期, 股價等",
+    systemPrompt = skillSystemPrompt,
     // toolList = undefined,
 }) {
     if (topP > 1 || topP < 0) {

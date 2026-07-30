@@ -85,7 +85,8 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
     try {
         const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
         const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
-        const userMessage = `[${userName}]: ${prompt}`;
+        const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
+        const userMessage = `[Chat: ${chatName}] [${userName}]: ${prompt}`;
         let contextMessages = [];
         // TODO: Limited size of contextMessages
         contextMessages.push({ role: "user", content: userMessage });
@@ -142,7 +143,35 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         if (reply) {
             contextChat.push({ role: "assistant", content: reply });
         }
-        await ctx.reply(`${reply}😭🐷`);
+
+        // 🎨 檢查 AI 回覆是否包含圖片生成指令
+        // 匹配 "gen image <描述>" (skill.md 格式) 或 "***gen image*** <描述>" (舊格式)
+        const genImageRegex = /(?:\*\*\*)?\s*gen image\s*(?:\*\*\*)?\s+(.+)/i;
+        const genImageMatch = reply.match(genImageRegex);
+
+        if (genImageMatch) {
+            const imagePrompt = genImageMatch[1].trim();
+            const cleanReply = reply.replace(genImageRegex, "").trim();
+
+            try {
+                await ctx.reply("畫緊...😭🐷");
+                const { text, imageData } = await getGeminiImage({ prompt: imagePrompt });
+                if (imageData) {
+                    const buffer = Buffer.from(imageData.data, "base64");
+                    await ctx.replyWithPhoto(
+                        { source: buffer },
+                        { caption: cleanReply || text ? `${cleanReply || text}😭🐷` : "😭🐷" }
+                    );
+                } else {
+                    await ctx.reply(text ? `${text}😭🐷` : "畫唔到😭🐷");
+                }
+            } catch (genError: any) {
+                console.log("🚀 ~ gen image error:", genError);
+                await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message} 😭🐷`);
+            }
+        } else {
+            await ctx.reply(`${reply}😭🐷`);
+        }
     } catch (error) {
         console.log("🚀 ~ bot.mention ~ error:", error);
         await ctx.reply(`${error.response.data.error.message} 😭🐷`);
