@@ -39,8 +39,15 @@ function convertToGeminiMessages(messages: any[]): any[] {
         if (msg.role === "system") continue; // System prompt handled separately
 
         if (msg.role === "user") {
+            const parts: any[] = [];
             if (msg.content) {
-                geminiMessages.push({ role: "user", parts: [{ text: msg.content }] });
+                parts.push({ text: msg.content });
+            }
+            if (msg.imageData) {
+                parts.push({ inlineData: msg.imageData });
+            }
+            if (parts.length > 0) {
+                geminiMessages.push({ role: "user", parts });
             }
         } else if (msg.role === "assistant") {
             const parts: any[] = [];

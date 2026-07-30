@@ -123,6 +123,62 @@ bot.command("picture", async (ctx) => {
         Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`)
     );
 });
+// Handle photos with caption mentioning the bot
+bot.on("photo", async (ctx: any) => {
+    const caption = ctx.message?.caption || "";
+    const botName = process.env.BOT_NAME || "";
+    if (!caption.includes(`@${botName}`)) return;
+
+    try {
+        const userName = ctx.message.from?.first_name || ctx.message.from?.username || "User";
+        const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
+        const chatId = ctx.chat.id;
+        const cleanCaption = caption.replace(`@${botName}`, "").trim();
+
+        // Get the largest photo (last in array)
+        const photo = ctx.message.photo[ctx.message.photo.length - 1];
+        const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+
+        // Download and convert to base64 (Telegram photos are always JPEG)
+        const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+        const base64 = Buffer.from(imgResp.data).toString("base64");
+        const mimeType = "image/jpeg";
+
+        const prompt = cleanCaption || "幫我睇下呢張圖片";
+        const recentHistory = getRecentHistory(chatId, 30);
+        let userMessage = prompt;
+        if (recentHistory) {
+            userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        } else {
+            userMessage = `[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        }
+
+        appendToHistory(chatId, userName, `[圖片] ${prompt}`);
+
+        const chatContext = getContextChat(ctx.chat.id);
+        chatContext.push({
+            role: "user",
+            content: userMessage,
+            imageData: { mimeType, data: base64 },
+        });
+
+        const { message: reply, usage } = await getGeminiResponse({
+            messages: chatContext.slice(-6),
+        });
+
+        const finalReply = reply || "睇唔到張圖 😭🐷";
+        if (finalReply) {
+            chatContext.push({ role: "assistant", content: finalReply });
+            appendToHistory(chatId, "Bot", finalReply);
+        }
+
+        await ctx.reply(`${finalReply}😭🐷`);
+    } catch (error: any) {
+        console.log("🚀 ~ photo handler error:", error);
+        await ctx.reply(`睇圖出錯: ${error.message} 😭🐷`);
+    }
+});
+
 // Mentions
 bot.mention(process.env.BOT_NAME as string, async (ctx) => {
     try {
