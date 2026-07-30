@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
-const GEMINI_MODEL = "gemini-3.5-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 
 // Load skill.md as default system prompt
 const skillMarkdownPath = path.resolve(process.cwd(), "skill.md");
