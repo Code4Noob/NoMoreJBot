@@ -5,7 +5,7 @@ j - Track your "Jed day" (inline buttons)
 picture - Send a random picture
 users - Show day count leaderboard
 me - Show your day count
-from <date> - Calculate time from a date (DD-MM-YYYY)
+from - Calculate time from a date (DD-MM-YYYY)
 weather - Get weather forecast
 marksix - Get Mark Six reminder
 llama - Ask Llama AI
