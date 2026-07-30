@@ -12,11 +12,54 @@ import { weather } from "../functions/weather";
 import { getGeminiResponse, getGeminiImage, functionHandlers } from "../functions/gemini";
 import { getResponseWithContext } from "../functions/llama";
 const fs = require("fs");
+const path = require("path");
 import axios from "axios";
 
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
 
-let contextChat = [];
+// File-based chat history: chat/history/{chatId}.txt
+const HISTORY_DIR = path.resolve(process.cwd(), "chat/history");
+const MAX_HISTORY_LINES = 200;
+
+function getHistoryPath(chatId: string | number): string {
+    return path.join(HISTORY_DIR, `${String(chatId)}.txt`);
+}
+
+function appendToHistory(chatId: string | number, name: string, text: string): void {
+    const filePath = getHistoryPath(chatId);
+    // Flatten multi-line messages into a single line
+    const flatText = text.replace(/\r?\n|\r/g, " ");
+    const line = `[${name}]: ${flatText}\n`;
+    try {
+        fs.appendFileSync(filePath, line, "utf-8");
+    } catch (err) {
+        console.error("❌ appendToHistory 失敗:", err);
+    }
+}
+
+function getRecentHistory(chatId: string | number, maxLines: number = 30): string {
+    const filePath = getHistoryPath(chatId);
+    try {
+        if (!fs.existsSync(filePath)) return "";
+        const content = fs.readFileSync(filePath, "utf-8");
+        const lines = content.trim().split("\n").filter(Boolean);
+        const recent = lines.slice(-maxLines);
+        return recent.join("\n");
+    } catch (err) {
+        console.error("❌ getRecentHistory 失敗:", err);
+        return "";
+    }
+}
+
+// In-memory bot-AI conversation context (separate from raw file-based chat history)
+const contextChatMap = new Map<string, any[]>();
+
+function getContextChat(chatId: string | number): any[] {
+    if (!contextChatMap.has(String(chatId))) {
+        contextChatMap.set(String(chatId), []);
+    }
+    return contextChatMap.get(String(chatId))!;
+}
 
 try {
     dbConnect();
@@ -86,18 +129,32 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
         const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
         const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
-        const userMessage = `[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        const chatId = ctx.chat.id;
+
+        // Build recent messages context from file-based history
+        const recentHistory = getRecentHistory(chatId, 30);
+        let userMessage = "";
+        if (recentHistory) {
+            userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        } else {
+            userMessage = `[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        }
+
+        // Also store the mention message in file-based history
+        appendToHistory(chatId, userName, prompt.trim() || "(mentioned bot)");
+
         let contextMessages = [];
         // TODO: Limited size of contextMessages
         contextMessages.push({ role: "user", content: userMessage });
-        contextChat.push({ role: "user", content: userMessage });
+        const chatContext = getContextChat(ctx.chat.id);
+        chatContext.push({ role: "user", content: userMessage });
 
         let {
             message: reply,
             usage,
             toolCalls,
         } = await getGeminiResponse({
-            messages: contextChat.slice(-6),
+            messages: chatContext.slice(-6),
         });
 
         // Handle model function calls in a loop (Gemini may make multiple calls)
@@ -141,7 +198,9 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
             () => {}
         );
         if (reply) {
-            contextChat.push({ role: "assistant", content: reply });
+            chatContext.push({ role: "assistant", content: reply });
+            // Also store bot reply in file-based history
+            appendToHistory(chatId, "Bot", reply);
         }
 
         // 🎨 檢查 AI 回覆是否包含圖片生成指令
@@ -177,6 +236,16 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         await ctx.reply(`${error.response.data.error.message} 😭🐷`);
     }
 });
+// Listen to all messages to build file-based chat history (requires bot privacy mode disabled)
+bot.on("message", (ctx: any) => {
+    const chatId = ctx.chat?.id;
+    const msgText = ctx.message?.text;
+    if (!chatId || !msgText) return;
+    const isBot = ctx.message.from?.id === ctx.botInfo?.id;
+    const name = isBot ? "Bot" : (ctx.message.from?.first_name || ctx.message.from?.username || "Unknown");
+    appendToHistory(chatId, name, msgText);
+});
+
 // Actions
 bot.action("updateDay", async (ctx) => {
     const userId = ctx.update.callback_query.from.id;
