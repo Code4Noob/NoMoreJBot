@@ -228,7 +228,7 @@ export async function getGeminiImage({
 }: {
     prompt: string;
 }): Promise<{ text: string | null; imageData: { mimeType: string; data: string } | null }> {
-    const IMAGE_MODEL = "gemini-3.1-flash-image";
+    const IMAGE_MODEL = "gemini-3.1-flash-lite-image";
 
     const requestBody: any = {
         contents: [
