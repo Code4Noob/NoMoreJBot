@@ -293,13 +293,14 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
     }
 });
 // Listen to all messages to build file-based chat history (requires bot privacy mode disabled)
-bot.on("message", (ctx: any) => {
+bot.on("message", (ctx: any, next: any) => {
     const chatId = ctx.chat?.id;
     const msgText = ctx.message?.text;
-    if (!chatId || !msgText) return;
+    if (!chatId || !msgText) return next?.();
     const isBot = ctx.message.from?.id === ctx.botInfo?.id;
     const name = isBot ? "Bot" : (ctx.message.from?.first_name || ctx.message.from?.username || "Unknown");
     appendToHistory(chatId, name, msgText);
+    next?.();
 });
 
 // Actions
@@ -400,13 +401,18 @@ bot.command("llama", async (ctx) => {
 
 bot.command("jp", async (ctx) => {
     const level = ctx.payload.trim() || 1;
-    const response = await axios.get(
-        `https://jlpt-vocab-api.vercel.app/api/words/random?level=${level}`
-    );
-    const message = Object.entries(response.data)
-        .map((x) => x.join(": "))
-        .join("\n");
-    await ctx.reply(message);
+    try {
+        const response = await axios.get(
+            `https://jlpt-vocab-api.vercel.app/api/words/random?level=${level}`
+        );
+        const message = Object.entries(response.data)
+            .map((x) => x.join(": "))
+            .join("\n");
+        await ctx.reply(message);
+    } catch (error: any) {
+        console.log("🚀 ~ jp error:", error?.response?.data || error.message);
+        await ctx.reply(`JP 查唔到: ${error?.response?.data?.error || error.message} 😭🐷`);
+    }
 });
 
 bot.command("draw", async (ctx) => {
