@@ -186,13 +186,38 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
         const chatId = ctx.chat.id;
 
+        // 🗨️ Handle reply_to_message context (text / image)
+        const replyTo = ctx.message.reply_to_message;
+        let replyText = "";
+        let replyImageData: { mimeType: string; data: string } | null = null;
+        if (replyTo) {
+            const replyName = replyTo.from?.first_name || replyTo.from?.username || "用戶";
+            if (replyTo.text) {
+                replyText = `[引用咗 ${replyName} 嘅訊息]: ${replyTo.text}\n\n`;
+            } else if (replyTo.photo && replyTo.photo.length > 0) {
+                replyText = `[引用咗 ${replyName} 嘅圖片]\n\n`;
+                try {
+                    const photo = replyTo.photo[replyTo.photo.length - 1];
+                    const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+                    const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+                    replyImageData = {
+                        mimeType: "image/jpeg",
+                        data: Buffer.from(imgResp.data).toString("base64"),
+                    };
+                } catch (err: any) {
+                    console.log("⚠️ reply-to 圖片下載失敗:", err?.message || err);
+                }
+            }
+        }
+
         // Build recent messages context from file-based history
         const recentHistory = getRecentHistory(chatId, 30);
+        const baseMsg = `${replyText}[Chat: ${chatName}] [${userName}]: ${prompt}`;
         let userMessage = "";
         if (recentHistory) {
-            userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n[Chat: ${chatName}] [${userName}]: ${prompt}`;
+            userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n${baseMsg}`;
         } else {
-            userMessage = `[Chat: ${chatName}] [${userName}]: ${prompt}`;
+            userMessage = baseMsg;
         }
 
         // Also store the mention message in file-based history
@@ -202,7 +227,9 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         // TODO: Limited size of contextMessages
         contextMessages.push({ role: "user", content: userMessage });
         const chatContext = getContextChat(ctx.chat.id);
-        chatContext.push({ role: "user", content: userMessage });
+        const chatMsg: any = { role: "user", content: userMessage };
+        if (replyImageData) chatMsg.imageData = replyImageData;
+        chatContext.push(chatMsg);
 
         let {
             message: reply,
