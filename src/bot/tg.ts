@@ -196,8 +196,8 @@ bot.on("photo", async (ctx: any) => {
     }
 });
 
-// Mentions
-bot.mention(process.env.BOT_NAME as string, async (ctx) => {
+// 共用 AI 對話流程（mention 同 reply-to-bot 都用）
+async function handleAIRequest(ctx: any) {
     try {
         const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
         const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
@@ -336,7 +336,23 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         const errMsg = error?.response?.data?.error?.message || error?.response?.data || error?.message || "未知錯誤";
         await ctx.reply(`${errMsg} 😭🐷`).catch(() => {});
     }
+}
+
+// Mentions
+bot.mention(process.env.BOT_NAME as string, (ctx: any) => handleAIRequest(ctx));
+
+// User reply bot send 嘅 message（即使冇 @bot）都會回應
+bot.on("text", (ctx: any, next: any) => {
+    const replyTo = ctx.message?.reply_to_message;
+    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const alreadyMentions = (ctx.message?.text || "").includes(`@${process.env.BOT_NAME}`);
+    if (repliedToBot && !alreadyMentions) {
+        handleAIRequest(ctx);
+    } else {
+        next?.();
+    }
 });
+
 // Listen to all messages to build file-based chat history (requires bot privacy mode disabled)
 bot.on("message", (ctx: any, next: any) => {
     const chatId = ctx.chat?.id;
