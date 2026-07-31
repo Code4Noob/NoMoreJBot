@@ -18,10 +18,27 @@ const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
 
 // File-based chat history: chat/history/{chatId}.txt
 const HISTORY_DIR = path.resolve(process.cwd(), "chat/history");
-const MAX_HISTORY_LINES = 200;
+// 檔案最大行數（超過就刪舊嘅）
+const MAX_HISTORY_LINES = parseInt(process.env.MAX_HISTORY_LINES || "200", 10);
+// 每次送俾 AI 嘅 context 行數
+const CONTEXT_SIZE = parseInt(process.env.CHAT_CONTEXT_SIZE || "30", 10);
 
 function getHistoryPath(chatId: string | number): string {
     return path.join(HISTORY_DIR, `${String(chatId)}.txt`);
+}
+
+function trimHistoryFile(filePath: string): void {
+    try {
+        const content = fs.readFileSync(filePath, "utf-8");
+        const lines = content.split("\n").filter(Boolean);
+        if (lines.length > MAX_HISTORY_LINES) {
+            const trimmed = lines.slice(-MAX_HISTORY_LINES).join("\n") + "\n";
+            fs.writeFileSync(filePath, trimmed, "utf-8");
+            console.log(`✂️ ${path.basename(filePath)}: ${lines.length} -> ${MAX_HISTORY_LINES} lines`);
+        }
+    } catch (err) {
+        console.error("❌ trimHistoryFile 失敗:", err);
+    }
 }
 
 function appendToHistory(chatId: string | number, name: string, text: string): void {
@@ -31,12 +48,14 @@ function appendToHistory(chatId: string | number, name: string, text: string): v
     const line = `[${name}]: ${flatText}\n`;
     try {
         fs.appendFileSync(filePath, line, "utf-8");
+        // 超過上限就刪舊 history
+        trimHistoryFile(filePath);
     } catch (err) {
         console.error("❌ appendToHistory 失敗:", err);
     }
 }
 
-function getRecentHistory(chatId: string | number, maxLines: number = 30): string {
+function getRecentHistory(chatId: string | number, maxLines: number = CONTEXT_SIZE): string {
     const filePath = getHistoryPath(chatId);
     try {
         if (!fs.existsSync(filePath)) return "";
@@ -144,7 +163,7 @@ bot.on("photo", async (ctx: any) => {
         const mimeType = "image/jpeg";
 
         const prompt = cleanCaption || "幫我睇下呢張圖片";
-        const recentHistory = getRecentHistory(chatId, 30);
+        const recentHistory = getRecentHistory(chatId);
         let userMessage = prompt;
         if (recentHistory) {
             userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n[Chat: ${chatName}] [${userName}]: ${prompt}`;
@@ -211,7 +230,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         }
 
         // Build recent messages context from file-based history
-        const recentHistory = getRecentHistory(chatId, 30);
+        const recentHistory = getRecentHistory(chatId);
         const baseMsg = `${replyText}[Chat: ${chatName}] [${userName}]: ${prompt}`;
         let userMessage = "";
         if (recentHistory) {

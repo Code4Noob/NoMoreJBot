@@ -8,6 +8,7 @@ Telegram bot（Telegraf）整合多個 AI model，支援圖片生成 / 圖片辨
 - **多 AI Provider** — 可切換 Gemini / DeepSeek / GPT
 - **圖片生成** — AI 回覆含 `gen image <描述>` 就自動生圖
 - **圖片辨識** — 傳相 + @bot caption 即分析
+- **回覆引用** — reply 一條訊息 + @bot，可讀埋被引用嗰條（text / 圖片）
 - **可切換 skillset** — 用 env 揀唔同 persona / skill.md
 - **聊天歷史** — file-based（`chat/history/{chatId}.txt`）
 - **VPN 支援** — 可將 AI API call 經 Surfshark OpenVPN tunnel 出街
@@ -40,11 +41,15 @@ pnpm start
 | `AI_PROVIDER` | 揀 model：`gemini` / `deepseek` / `gpt` | `gemini` |
 | `AI_SKILL` | 揀 skillset（`src/ai/skills/<AI_SKILL>.md`） | `skill` |
 | `GEMINI_API_KEY` | Gemini | - |
+| `GEMINI_MODEL` | Gemini 對話 model | `gemini-3.6-flash` |
+| `GEMINI_IMAGE_MODEL` | Gemini 生圖 model | `gemini-3.1-flash-lite-image` |
 | `DEEPSEEK_API_KEY` | DeepSeek V4 | - |
 | `DEEPSEEK_MODEL` | DeepSeek model | `deepseek-chat` |
 | `DEEPSEEK_BASE_URL` | DeepSeek API base | `https://api.deepseek.com` |
 | `AZURE_OPENAI_URL` | GPT（Azure OpenAI）endpoint | - |
 | `AZURE_OPENAI_KEY` | GPT API key | - |
+| `CHAT_CONTEXT_SIZE` | 每次送俾 AI 嘅歷史行數 | `30` |
+| `MAX_HISTORY_LINES` | 歷史檔案最大行數（超過刪舊） | `200` |
 | `MONGOURL` | MongoDB connection string | 必填 |
 | `DB_NAME` | MongoDB database name | - |
 
@@ -86,6 +91,13 @@ AI_PROVIDER=gpt       # 需要 AZURE_OPENAI_URL + AZURE_OPENAI_KEY
 
 所有 provider 回傳格式一致（`message` / `toolCalls` / `usage`），都支援 tool calling，唔使改 bot 邏輯。
 
+Gemini 可以喺 env 揀 model：
+
+```env
+GEMINI_MODEL=gemini-3.6-flash          # 對話
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-lite-image  # 生圖
+```
+
 ## Skillset（persona）
 
 `src/ai/skills/` 放唔同嘅 persona 設定，用 `AI_SKILL` 切換：
@@ -116,7 +128,14 @@ sudo node scripts/vpn-connect.js
 
 ## 聊天歷史
 
-所有群組訊息會寫入 `chat/history/{chatId}.txt`，@bot 時會自動攞最近 30 條做 context。
+所有群組訊息會寫入 `chat/history/{chatId}.txt`，@bot 時會自動攞最近嘅行數做 context。
+
+可以喺 env 控制：
+
+```env
+CHAT_CONTEXT_SIZE=30     # 每次送俾 AI 嘅行數
+MAX_HISTORY_LINES=200    # 檔案最大行數，超過會自動刪走最舊嘅
+```
 
 > 注意：需要喺 BotFather 關閉 Privacy Mode，bot 先收到全部群組訊息。
 
