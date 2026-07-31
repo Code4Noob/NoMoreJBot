@@ -287,9 +287,10 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         } else {
             await ctx.reply(`${reply}😭🐷`);
         }
-    } catch (error) {
-        console.log("🚀 ~ bot.mention ~ error:", error);
-        await ctx.reply(`${error.response.data.error.message} 😭🐷`);
+    } catch (error: any) {
+        console.log("🚀 ~ bot.mention ~ error:", error?.message || error);
+        const errMsg = error?.response?.data?.error?.message || error?.response?.data || error?.message || "未知錯誤";
+        await ctx.reply(`${errMsg} 😭🐷`).catch(() => {});
     }
 });
 // Listen to all messages to build file-based chat history (requires bot privacy mode disabled)
