@@ -8,7 +8,7 @@ set("strictQuery", true);
 
 const dbConnect = async () => {
   return await connect(url, {
-    dbName: process.env.dbName,
+    dbName: process.env.DB_NAME,
   });
 };
 

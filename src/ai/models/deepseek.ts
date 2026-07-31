@@ -1,6 +1,7 @@
 import vpnAxios from "../../utils/vpn";
 import { toolList } from "../tools";
 import { skillSystemPrompt } from "../skill";
+import { logAIResponse } from "../logger";
 import type { AIRequest, AIResponse, AIMessage } from "../types";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY as string;
@@ -59,6 +60,15 @@ export async function getDeepSeekResponse({
                 arguments: tc.function.arguments,
             },
         }));
+
+        logAIResponse({
+            provider: "deepseek",
+            model: DEEPSEEK_MODEL,
+            finishReason: choice?.finish_reason,
+            tokens: data.usage?.total_tokens ?? 0,
+            toolCalls: toolCalls?.length ?? 0,
+            message: msg?.content || null,
+        });
 
         return {
             message: msg?.content || null,

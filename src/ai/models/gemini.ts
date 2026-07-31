@@ -1,5 +1,6 @@
 import vpnAxios from "../../utils/vpn";
 import { skillSystemPrompt } from "../skill";
+import { logAIResponse } from "../logger";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 const GEMINI_MODEL = "gemini-3.6-flash";
@@ -142,8 +143,6 @@ export async function getGeminiResponse({
         const totalTokens = data.usageMetadata?.totalTokenCount ?? 0;
         const parts = candidate.content?.parts ?? [];
 
-        console.log("🚀 ~ getGeminiResponse ~ finishReason:", candidate.finishReason, "parts:", parts.length, JSON.stringify(parts).slice(0, 500));
-
         if (parts.length === 0) {
             return { message: null, toolCalls: undefined, usage: totalTokens, imageData: null };
         }
@@ -175,6 +174,15 @@ export async function getGeminiResponse({
         }
 
         const message = textParts.length > 0 ? textParts.join("\n") : null;
+
+        logAIResponse({
+            provider: "gemini",
+            model: GEMINI_MODEL,
+            finishReason: candidate.finishReason,
+            tokens: totalTokens,
+            toolCalls: toolCalls.length,
+            message,
+        });
 
         return {
             message,

@@ -1,6 +1,7 @@
 import vpnAxios from "../../utils/vpn";
 import { toolList } from "../tools";
 import { skillSystemPrompt } from "../skill";
+import { logAIResponse } from "../logger";
 import type { AIRequest, AIResponse } from "../types";
 
 /**
@@ -56,6 +57,15 @@ export async function getGptResponse({
     }
 
     const msg = data.choices[0].message;
+
+    logAIResponse({
+        provider: "gpt",
+        model: process.env.AZURE_OPENAI_URL?.split("/").pop() || "gpt",
+        finishReason: data.choices[0].finish_reason,
+        tokens: data.usage?.total_tokens ?? 0,
+        toolCalls: msg?.tool_calls?.length ?? 0,
+        message: msg?.content || null,
+    });
 
     return {
         message: msg?.content || null,
