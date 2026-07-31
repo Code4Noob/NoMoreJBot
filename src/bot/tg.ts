@@ -147,9 +147,6 @@ bot.on("photo", async (ctx: any) => {
     if (!caption.includes(`@${botName}`)) return;
 
     try {
-        const userName = ctx.message.from?.first_name || ctx.message.from?.username || "User";
-        const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
-        const chatId = ctx.chat.id;
         const cleanCaption = caption.replace(`@${botName}`, "").trim();
 
         // Get the largest photo (last in array)
@@ -158,48 +155,23 @@ bot.on("photo", async (ctx: any) => {
 
         // Download and convert to base64 (Telegram photos are always JPEG)
         const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
-        const base64 = Buffer.from(imgResp.data).toString("base64");
-        const mimeType = "image/jpeg";
+        const imageData = {
+            mimeType: "image/jpeg",
+            data: Buffer.from(imgResp.data).toString("base64"),
+        };
 
-        const prompt = cleanCaption || "幫我睇下呢張圖片";
-        const recentHistory = getRecentHistory(chatId);
-        let userMessage = prompt;
-        if (recentHistory) {
-            userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n[Chat: ${chatName}] [${userName}]: ${prompt}`;
-        } else {
-            userMessage = `[Chat: ${chatName}] [${userName}]: ${prompt}`;
-        }
-
-        appendToHistory(chatId, userName, `[圖片] ${prompt}`);
-
-        const chatContext = getContextChat(ctx.chat.id);
-        chatContext.push({
-            role: "user",
-            content: userMessage,
-            imageData: { mimeType, data: base64 },
-        });
-
-        const { message: reply, usage } = await getAIResponse({
-            messages: chatContext.slice(-6),
-        });
-
-        const finalReply = reply || "睇唔到張圖 😭🐷";
-        if (finalReply) {
-            chatContext.push({ role: "assistant", content: finalReply });
-            appendToHistory(chatId, "Bot", finalReply);
-        }
-
-        await ctx.reply(`${finalReply}😭🐷`);
+        // 重用共用 AI flow（連 reply_to / 歷史 / tool calling 都有）
+        await handleAIRequest(ctx, { prompt: cleanCaption || "幫我睇下呢張圖片", imageData });
     } catch (error: any) {
         console.log("🚀 ~ photo handler error:", error);
         await ctx.reply(`睇圖出錯: ${error.message} 😭🐷`);
     }
 });
 
-// 共用 AI 對話流程（mention 同 reply-to-bot 都用）
-async function handleAIRequest(ctx: any) {
+// 共用 AI 對話流程（mention / reply-to-bot / photo 都用）
+async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: { mimeType: string; data: string } | null }) {
     try {
-        const prompt = ctx.message.text.replace(`@${process.env.BOT_NAME}`, "");
+        const prompt = (opts?.prompt ?? ctx.message.text.replace(`@${process.env.BOT_NAME}`, "")).trim();
         const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
         const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
         const chatId = ctx.chat.id;
@@ -246,7 +218,8 @@ async function handleAIRequest(ctx: any) {
         contextMessages.push({ role: "user", content: userMessage });
         const chatContext = getContextChat(ctx.chat.id);
         const chatMsg: any = { role: "user", content: userMessage };
-        if (replyImageData) chatMsg.imageData = replyImageData;
+        const imgData = opts?.imageData ?? replyImageData;
+        if (imgData) chatMsg.imageData = imgData;
         chatContext.push(chatMsg);
 
         let {
