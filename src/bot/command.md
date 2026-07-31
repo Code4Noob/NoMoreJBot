@@ -8,6 +8,5 @@ me - Show your day count
 from - Calculate time from a date (DD-MM-YYYY)
 weather - Get weather forecast
 marksix - Get Mark Six reminder
-llama - Ask Llama AI
 jp - Get random JLPT vocabulary word
 draw- Generate an image using AI

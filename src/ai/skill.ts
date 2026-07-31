@@ -2,7 +2,8 @@ import fs from "fs";
 import path from "path";
 
 // 載入 skill.md 做預設 system prompt（provider 共用）
-const skillMarkdownPath = path.resolve(process.cwd(), "skill.md");
+// 真實 skill.md 係 gitignored，參考 src/ai/skills/skill.md.example
+const skillMarkdownPath = path.resolve(process.cwd(), "src/ai/skills/skill.md");
 let skillSystemPrompt = "";
 try {
     if (fs.existsSync(skillMarkdownPath)) {

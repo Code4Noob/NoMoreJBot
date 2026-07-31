@@ -11,3 +11,7 @@ dist
 chat/history/*
 
 vpn/*
+
+# AI skill - 真實 skill.md 唔 commit（可能有 persona/config）
+src/ai/skills/skill.md
+!src/ai/skills/skill.md.example
