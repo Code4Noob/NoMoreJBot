@@ -1,6 +1,6 @@
-import { getGeminiResponse, getGeminiImage } from "./models/gemini";
-import { getDeepSeekResponse } from "./models/deepseek";
-import { getGptResponse } from "./models/gpt";
+import { getGeminiResponse, getGeminiImage, GEMINI_MODEL } from "./models/gemini";
+import { getDeepSeekResponse, DEEPSEEK_MODEL } from "./models/deepseek";
+import { getGptResponse, GPT_MODEL } from "./models/gpt";
 import { functionHandlers, toolList } from "./tools";
 import type { AIRequest, AIResponse } from "./types";
 
@@ -12,10 +12,17 @@ import type { AIRequest, AIResponse } from "./types";
  *   AI_PROVIDER=deepseek  -> DeepSeek V4
  *   AI_PROVIDER=gpt       -> GPT（Azure OpenAI）
  */
-export async function getAIResponse(opts: AIRequest): Promise<AIResponse> {
-    const provider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+const activeProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+const activeModel =
+    activeProvider === "deepseek"
+        ? DEEPSEEK_MODEL
+        : activeProvider === "gpt"
+        ? GPT_MODEL
+        : GEMINI_MODEL;
+console.log(`🤖 AI Model: ${activeProvider} / ${activeModel}`);
 
-    switch (provider) {
+export async function getAIResponse(opts: AIRequest): Promise<AIResponse> {
+    switch (activeProvider) {
         case "deepseek":
             return getDeepSeekResponse(opts);
         case "gpt":

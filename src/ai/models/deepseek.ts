@@ -5,7 +5,7 @@ import { logAIResponse } from "../logger";
 import type { AIRequest, AIResponse, AIMessage } from "../types";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY as string;
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
+export const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 
 /**

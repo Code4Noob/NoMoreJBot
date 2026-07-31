@@ -9,6 +9,13 @@ import type { AIRequest, AIResponse } from "../types";
  * - 支援 function calling（tool_calls）
  * - 回傳格式同其他 provider 一致
  */
+// 由 AZURE_OPENAI_URL 攞 deployment / model 名（例如 gpt-4o-mini）
+export const GPT_MODEL = (() => {
+    const url = process.env.AZURE_OPENAI_URL || "";
+    const match = url.match(/deployments\/([^/?]+)/);
+    return match ? match[1] : "gpt";
+})();
+
 export async function getGptResponse({
     messages,
     topP = 1,
@@ -60,7 +67,7 @@ export async function getGptResponse({
 
     logAIResponse({
         provider: "gpt",
-        model: process.env.AZURE_OPENAI_URL?.split("/").pop() || "gpt",
+        model: GPT_MODEL,
         finishReason: data.choices[0].finish_reason,
         tokens: data.usage?.total_tokens ?? 0,
         toolCalls: msg?.tool_calls?.length ?? 0,

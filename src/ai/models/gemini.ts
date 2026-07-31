@@ -3,8 +3,8 @@ import { skillSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-lite-image";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+export const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-lite-image";
 
 interface ToolCall {
     id: string;
