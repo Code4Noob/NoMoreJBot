@@ -34,7 +34,6 @@ function trimHistoryFile(filePath: string): void {
         if (lines.length > MAX_HISTORY_LINES) {
             const trimmed = lines.slice(-MAX_HISTORY_LINES).join("\n") + "\n";
             fs.writeFileSync(filePath, trimmed, "utf-8");
-            console.log(`✂️ ${path.basename(filePath)}: ${lines.length} -> ${MAX_HISTORY_LINES} lines`);
         }
     } catch (err) {
         console.error("❌ trimHistoryFile 失敗:", err);
