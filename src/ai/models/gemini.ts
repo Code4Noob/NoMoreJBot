@@ -1,22 +1,8 @@
-import axios from "axios";
-import vpnAxios from "../utils/vpn";
-import fs from "fs";
-import path from "path";
+import vpnAxios from "../../utils/vpn";
+import { skillSystemPrompt } from "../skill";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 const GEMINI_MODEL = "gemini-3.6-flash";
-
-// Load skill.md as default system prompt
-const skillMarkdownPath = path.resolve(process.cwd(), "skill.md");
-let skillSystemPrompt = "";
-try {
-    if (fs.existsSync(skillMarkdownPath)) {
-        skillSystemPrompt = fs.readFileSync(skillMarkdownPath, "utf-8");
-        console.log("✅ Gemini: 成功載入 skill.md 知識庫！");
-    }
-} catch (err) {
-    console.error("❌ Gemini: 讀取 skill.md 失敗:", err);
-}
 
 interface ToolCall {
     id: string;
@@ -107,36 +93,7 @@ const geminiToolList = [
     }
 ];
 
-export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
-    "get_url_text_content": async ({ url }: { url: string }) => {
-        try {
-            const response = await vpnAxios.get(url);
-            const $ = (await import("cheerio")).load(response.data);
-            $("script, style").remove();
-            let visibleText = "";
-            function extractText(element: any) {
-                $(element).contents().each((_: any, el: any) => {
-                    if (el.type === "text") {
-                        visibleText += $(el).text().trim() + " ";
-                    } else if (el.type === "tag" && !["script", "style"].includes(el.name)) {
-                        extractText(el);
-                    }
-                });
-            }
-            extractText($("body"));
-            visibleText = visibleText.replace(/\s+/g, " ").trim();
-            return {
-                siteTitle: $("title").text(),
-                textContent: visibleText,
-            };
-        } catch (error) {
-            return {
-                siteTitle: "Error while trying to get title",
-                textContent: "Error while trying to get body text",
-            };
-        }
-    }
-};
+// functionHandlers 已移到 src/ai/tools.ts（provider 共用）
 
 export async function getGeminiResponse({
     messages,

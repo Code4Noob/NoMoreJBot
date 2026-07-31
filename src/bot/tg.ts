@@ -2,15 +2,14 @@ import { Context, Input, Markup, Telegraf } from "telegraf";
 import { User } from "../models/user";
 import { Chat } from "../models/chat";
 import { dbConnect, dbDisconnect } from "../db";
-import { from, validateJCount } from "../functions/date";
+import { from, validateJCount } from "../tools/date";
 
 import { v4 as uuidv4 } from "uuid";
 import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
-import { markSixReminder } from "../functions/marksix";
-import { weather } from "../functions/weather";
-import { getGeminiResponse, getGeminiImage, functionHandlers } from "../functions/gemini";
-import { getResponseWithContext } from "../functions/llama";
+import { markSixReminder } from "../tools/marksix";
+import { weather } from "../tools/weather";
+import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
 const fs = require("fs");
 const path = require("path");
 import axios from "axios";
@@ -162,7 +161,7 @@ bot.on("photo", async (ctx: any) => {
             imageData: { mimeType, data: base64 },
         });
 
-        const { message: reply, usage } = await getGeminiResponse({
+        const { message: reply, usage } = await getAIResponse({
             messages: chatContext.slice(-6),
         });
 
@@ -199,7 +198,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         // Also store the mention message in file-based history
         appendToHistory(chatId, userName, prompt.trim() || "(mentioned bot)");
 
-        let contextMessages = [];
+        let contextMessages: any[] = [];
         // TODO: Limited size of contextMessages
         contextMessages.push({ role: "user", content: userMessage });
         const chatContext = getContextChat(ctx.chat.id);
@@ -209,7 +208,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
             message: reply,
             usage,
             toolCalls,
-        } = await getGeminiResponse({
+        } = await getAIResponse({
             messages: chatContext.slice(-6),
         });
 
@@ -235,7 +234,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
                     });
                 })
             );
-            const geminiResponse = await getGeminiResponse({
+            const geminiResponse = await getAIResponse({
                 messages: contextMessages,
             });
             if (geminiResponse.message) {
@@ -388,16 +387,6 @@ bot.command("weather", async (ctx) => {
 bot.command("marksix", async (ctx) => {
     const message = await markSixReminder();
     await ctx.reply(message);
-});
-
-bot.command("llama", async (ctx) => {
-    const prompt = ctx.payload.trim();
-    const response = await getResponseWithContext(
-        prompt,
-        contextMessages.slice(-6),
-        {}
-    );
-    await ctx.reply(response.message);
 });
 
 bot.command("jp", async (ctx) => {
