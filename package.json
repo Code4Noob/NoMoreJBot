@@ -23,6 +23,7 @@
     "moment-timezone": "^0.5.47",
     "mongoose": "^6.13.8",
     "node-cron": "^3.0.3",
+    "node-openvpn": "^0.1.1",
     "sqlite3": "^5.1.7",
     "telegraf": "^4.16.3",
     "ts-node": "^10.9.2",

@@ -1,4 +1,5 @@
 import axios from "axios";
+import vpnAxios from "../utils/vpn";
 import fs from "fs";
 import path from "path";
 
@@ -109,7 +110,7 @@ const geminiToolList = [
 export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
     "get_url_text_content": async ({ url }: { url: string }) => {
         try {
-            const response = await axios.get(url);
+            const response = await vpnAxios.get(url);
             const $ = (await import("cheerio")).load(response.data);
             $("script, style").remove();
             let visibleText = "";
@@ -170,7 +171,7 @@ export async function getGeminiResponse({
     }
 
     try {
-        const { data } = await axios.post(
+        const { data } = await vpnAxios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
             requestBody
         );
@@ -250,7 +251,7 @@ export async function getGeminiImage({
     };
 
     try {
-        const { data } = await axios.post(
+        const { data } = await vpnAxios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
             requestBody
         );
