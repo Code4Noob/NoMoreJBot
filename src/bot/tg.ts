@@ -248,7 +248,7 @@ bot.mention(process.env.BOT_NAME as string, async (ctx) => {
         if (!reply) reply = "冇嘢想講";
 
         fs.appendFile(
-            "log.log",
+            path.join(process.cwd(), "log/log.log"),
             JSON.stringify({ prompt, reply, usage }) + "\n",
             () => {}
         );

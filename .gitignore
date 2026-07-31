@@ -8,6 +8,9 @@ dist
 
 *.log
 
+# logs
+log/
+
 chat/history/*
 
 vpn/*
