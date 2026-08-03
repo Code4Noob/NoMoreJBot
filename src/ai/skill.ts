@@ -57,13 +57,17 @@ export function getSystemPrompt(userId?: string | number): string {
     return prompt;
 }
 
-/** 保存 / 更新某 user 嘅專屬 skill（寫入 src/ai/skills/users/{userId}.md） */
+/**
+ * 保存 / 更新某 user 嘅專屬 skill（寫入 src/ai/skills/users/{userId}.md）
+ * 注意：係「成個 replace」——writeFileSync 會覆蓋成個檔案，唔會 append
+ */
 export function saveUserSkill(userId: string | number, content: string): void {
     try {
         if (!fs.existsSync(USERS_DIR)) fs.mkdirSync(USERS_DIR, { recursive: true });
         const p = path.join(USERS_DIR, `${String(userId)}.md`);
+        // 成個覆蓋，唔係 append
         fs.writeFileSync(p, `${content.trim()}\n`, "utf-8");
-        console.log(`💾 已更新 user ${userId} 嘅 skill`);
+        console.log(`💾 已更新 user ${userId} 嘅 skill（replace）`);
     } catch (err) {
         console.error(`❌ 寫入 user skill ${userId} 失敗:`, err);
     }
