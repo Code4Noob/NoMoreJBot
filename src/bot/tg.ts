@@ -314,12 +314,16 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 // Mentions
 bot.mention(process.env.BOT_NAME as string, (ctx: any) => handleAIRequest(ctx));
 
-// User reply bot send 嘅 message（即使冇 @bot）都會回應
+// Direct message / reply-to-bot 都會 AI 回應（即使冇 @bot）
 bot.on("text", (ctx: any, next: any) => {
+    const text = ctx.message?.text || "";
+    const isCommand = text.startsWith("/"); // commands 留返俾 bot.command() 處理
+    const isPrivate = ctx.chat?.type === "private"; // 私訊 bot 唔使 @
     const replyTo = ctx.message?.reply_to_message;
     const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
-    const alreadyMentions = (ctx.message?.text || "").includes(`@${process.env.BOT_NAME}`);
-    if (repliedToBot && !alreadyMentions) {
+    const alreadyMentions = text.includes(`@${process.env.BOT_NAME}`);
+
+    if (!isCommand && (isPrivate || (repliedToBot && !alreadyMentions))) {
         handleAIRequest(ctx);
     } else {
         next?.();

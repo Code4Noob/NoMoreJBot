@@ -45,6 +45,15 @@ function finalize() {
 
         const tunIP = execSync(`ip -4 -o addr show ${link} | awk '{print $4}' | cut -d/ -f1`, { encoding: "utf-8" }).trim();
 
+        // 攞 tunnel subnet（例如 10.8.8.0/24）——用 subnet rule，reconnect 派新 IP 都唔使改
+        let tunNet = "";
+        try {
+            tunNet = execSync(`ip route show dev ${link} | grep proto kernel | awk '{print $1}' | head -1`, { encoding: "utf-8" }).trim();
+        } catch (_) { /* ignore */ }
+        if (!tunNet) {
+            tunNet = tunIP.split(".").slice(0, 3).join(".") + ".0/24";
+        }
+
         // 從 openvpn log 攞 route-gateway
         let gw = "";
         try {
@@ -58,13 +67,13 @@ function finalize() {
             gw = subnet;
         }
 
-        console.log(`✅ tun: ${link}, IP: ${tunIP}, gateway: ${gw}`);
+        console.log(`✅ tun: ${link}, IP: ${tunIP}, net: ${tunNet}, gateway: ${gw}`);
 
         // 清舊 rule/table 再加（tolerate 唔存在）
         execSync(`ip rule del from all lookup ${ROUTE_TABLE} 2>/dev/null; true`);
         execSync(`ip route flush table ${ROUTE_TABLE} 2>/dev/null; true`);
         execSync(`ip route add default via ${gw} dev ${link} table ${ROUTE_TABLE}`);
-        execSync(`ip rule add from ${tunIP} lookup ${ROUTE_TABLE}`);
+        execSync(`ip rule add from ${tunNet} lookup ${ROUTE_TABLE}`);
 
         setEnvVar(ENV_FILE, "VPN_TUNNEL_IP", tunIP);
         console.log(`📝 已寫入 .env: VPN_TUNNEL_IP=${tunIP}`);
