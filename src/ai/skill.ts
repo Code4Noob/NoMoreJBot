@@ -3,6 +3,7 @@ import path from "path";
 
 const SKILLS_DIR = path.resolve(process.cwd(), "src/ai/skills");
 const USERS_DIR = path.join(SKILLS_DIR, "users");
+const UTILS_DIR = path.join(SKILLS_DIR, "utils");
 
 function loadFile(p: string): string {
     try {
@@ -31,6 +32,31 @@ if (baseSystemPrompt.trim()) {
  * 按 user 組合 system prompt：base + 該 user 嘅專屬 skill（如有）
  * user skill 檔案：src/ai/skills/users/{userId}.md
  */
+/** 讀取 utils/ 入面所有 .md skill，合併做一個 string（每個自動加 [skill: 名稱] 標頭） */
+function loadUtilsPrompt(): string {
+    let combined = "";
+    try {
+        if (!fs.existsSync(UTILS_DIR)) return "";
+        const files = fs.readdirSync(UTILS_DIR).filter((f) => f.endsWith(".md")).sort();
+        for (const f of files) {
+            let content = loadFile(path.join(UTILS_DIR, f)).trim();
+            if (content) {
+                const name = path.basename(f, ".md");
+                // 檔案本身有 [skill: ...] 標頭就保留，冇就自動加
+                if (!/^\[skill:/.test(content)) {
+                    content = `[skill: ${name}]\n${content}`;
+                }
+                combined += (combined ? "\n\n" : "") + content;
+            }
+        }
+    } catch (err) {
+        console.error("❌ 讀取 utils skills 失敗:", err);
+    }
+    return combined;
+}
+
+const utilsSystemPrompt = loadUtilsPrompt();
+
 /** 確保某 user 有 skill 檔案（未有就自動建立一個空嘅） */
 function ensureUserSkill(userId: string | number): void {
     try {
@@ -46,15 +72,18 @@ function ensureUserSkill(userId: string | number): void {
 }
 
 export function getSystemPrompt(userId?: string | number): string {
-    let prompt = baseSystemPrompt;
+    const parts: string[] = [];
+    // base（persona）優先
+    if (baseSystemPrompt.trim()) parts.push(baseSystemPrompt.trim());
+    // utils（圖片生成等工具指示）
+    if (utilsSystemPrompt.trim()) parts.push(utilsSystemPrompt.trim());
+    // user 專屬人格
     if (userId != null) {
         ensureUserSkill(userId); // 未有就自動建立
-        const userSkill = loadFile(path.join(USERS_DIR, `${String(userId)}.md`));
-        if (userSkill.trim()) {
-            prompt = prompt.trim() ? `${prompt.trim()}\n\n${userSkill.trim()}` : userSkill.trim();
-        }
+        const userSkill = loadFile(path.join(USERS_DIR, `${String(userId)}.md`)).trim();
+        if (userSkill) parts.push(userSkill);
     }
-    return prompt;
+    return parts.join("\n\n");
 }
 
 /**

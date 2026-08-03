@@ -18,4 +18,7 @@ vpn/*
 # AI skill - 真實 skill .md 唔 commit（可能有 persona/config），.example 照 commit
 src/ai/skills/*.md
 src/ai/skills/users/[0-9]*.md
+src/ai/skills/utils/*.md
 !src/ai/skills/*.example
+!src/ai/skills/users/README.md
+!src/ai/skills/utils/README.md
