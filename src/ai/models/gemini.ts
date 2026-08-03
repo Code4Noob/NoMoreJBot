@@ -1,5 +1,5 @@
 import vpnAxios from "../../utils/vpn";
-import { skillSystemPrompt } from "../skill";
+import { baseSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
@@ -101,7 +101,7 @@ export async function getGeminiResponse({
     messages,
     topP = 1,
     temperature = 0.6,
-    systemPrompt = skillSystemPrompt,
+    systemPrompt = baseSystemPrompt,
 }: {
     messages: { role: string; content: string | null }[];
     topP?: number;

@@ -9,7 +9,7 @@ Telegram bot（Telegraf）整合多個 AI model，支援圖片生成 / 圖片辨
 - **圖片生成** — AI 回覆含 `gen image <描述>` 就自動生圖
 - **圖片辨識** — 傳相 + @bot caption 即分析
 - **回覆引用** — reply 一條訊息 + @bot，可讀埋被引用嗰條（text / 圖片）
-- **可切換 skillset** — 用 env 揀唔同 persona / skill.md
+- **可切換 skillset** — base skill + 每個 user 獨有嘅人格
 - **聊天歷史** — file-based（`chat/history/{chatId}.txt`）
 - **VPN 支援** — 可將 AI API call 經 Surfshark OpenVPN tunnel 出街
 - **其他指令** — 天氣、六合彩、JLPT 詞彙、Day 追蹤等
@@ -39,7 +39,7 @@ pnpm start
 | `BOT_TOKEN` | Telegram bot token | 必填 |
 | `BOT_NAME` | Bot 用戶名（mention 用） | 必填 |
 | `AI_PROVIDER` | 揀 model：`gemini` / `deepseek` / `gpt` | `gemini` |
-| `AI_SKILL` | 揀 skillset（`src/ai/skills/<AI_SKILL>.md`） | `skill` |
+| `AI_SKILL` | 揀 base skill（`src/ai/skills/<AI_SKILL>.md`） | `base` |
 | `GEMINI_API_KEY` | Gemini | - |
 | `GEMINI_MODEL` | Gemini 對話 model | `gemini-3.6-flash` |
 | `GEMINI_IMAGE_MODEL` | Gemini 生圖 model | `gemini-3.1-flash-lite-image` |
@@ -100,15 +100,31 @@ GEMINI_IMAGE_MODEL=gemini-3.1-flash-lite-image  # 生圖
 
 ## Skillset（persona）
 
-`src/ai/skills/` 放唔同嘅 persona 設定，用 `AI_SKILL` 切換：
+### Base skill（人人通用）
+
+`src/ai/skills/` 放 base 人格，用 `AI_SKILL` 切換：
 
 ```env
-AI_SKILL=skill   # 預設
+AI_SKILL=base    # 預設
 AI_SKILL=admin
 ```
 
-- 真實 `skill.md` 係 gitignored（可能含 persona / config）
-- 參考 `skill.md.example` 整新 skillset
+- 真實 `base.md` 係 gitignored（可能含 persona / config）
+- 參考 `base.md.example` 整新 skillset
+
+### Per-user skill（每個 user 獨有人格）
+
+每個 user 可以喺 `src/ai/skills/users/{userId}.md` 放專屬人格（`userId` = Telegram user ID）：
+
+```
+src/ai/skills/users/123456789.md
+```
+
+- 存在就會同 base skill **合併**做 system prompt
+- 唔存在就淨係用 base skill
+- 呢啲檔案係 gitignored
+
+**Bot 可以自己更新** — `base.md` 教咗 AI：想改變對某 user 嘅人格時，喺回覆最尾加 `[user_skill]: <新人格>`，bot 會自動寫入 `users/{userId}.md` 並由回覆中剝走 marker。
 
 ## VPN（Surfshark OpenVPN）
 

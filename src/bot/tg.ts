@@ -10,6 +10,7 @@ import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../tools/marksix";
 import { weather } from "../tools/weather";
 import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
+import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 const fs = require("fs");
 const path = require("path");
 import axios from "axios";
@@ -228,6 +229,7 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             toolCalls,
         } = await getAIResponse({
             messages: chatContext.slice(-6),
+            systemPrompt: getSystemPrompt(ctx.from?.id),
         });
 
         // Handle model function calls in a loop (Gemini may make multiple calls)
@@ -254,6 +256,7 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             );
             const geminiResponse = await getAIResponse({
                 messages: contextMessages,
+                systemPrompt: getSystemPrompt(ctx.from?.id),
             });
             if (geminiResponse.message) {
                 reply = geminiResponse.message;
@@ -264,6 +267,15 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 
         // Fallback if message is still null after all tool rounds
         if (!reply) reply = "冇嘢想講";
+
+        // 🧠 處理 [user_skill]: 更新對某 user 嘅專屬人格
+        const userSkillIdx = reply.indexOf("[user_skill]:");
+        if (userSkillIdx !== -1 && ctx.from?.id) {
+            const content = reply.slice(userSkillIdx + "[user_skill]:".length).trim();
+            if (content) saveUserSkill(ctx.from.id, content);
+            // 剝走 marker 同內容，淨係顯示原本嘅回覆
+            reply = reply.slice(0, userSkillIdx).trim() || "已更新對你嘅專屬人格 😭🐷";
+        }
 
         fs.appendFile(
             path.join(process.cwd(), "log/log.log"),

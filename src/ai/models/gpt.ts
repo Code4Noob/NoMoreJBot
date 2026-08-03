@@ -1,6 +1,6 @@
 import vpnAxios from "../../utils/vpn";
 import { toolList } from "../tools";
-import { skillSystemPrompt } from "../skill";
+import { baseSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
 import type { AIRequest, AIResponse } from "../types";
 
@@ -20,7 +20,7 @@ export async function getGptResponse({
     messages,
     topP = 1,
     temperature = 0.6,
-    systemPrompt = skillSystemPrompt,
+    systemPrompt = baseSystemPrompt,
 }: AIRequest): Promise<AIResponse> {
     if (topP > 1 || topP < 0) {
         throw new Error("Top P must be a number between 0 to 1");

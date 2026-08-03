@@ -1,6 +1,6 @@
 import vpnAxios from "../../utils/vpn";
 import { toolList } from "../tools";
-import { skillSystemPrompt } from "../skill";
+import { baseSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
 import type { AIRequest, AIResponse, AIMessage } from "../types";
 
@@ -17,7 +17,7 @@ export async function getDeepSeekResponse({
     messages,
     topP = 1,
     temperature = 0.6,
-    systemPrompt = skillSystemPrompt,
+    systemPrompt = baseSystemPrompt,
 }: AIRequest): Promise<AIResponse> {
     const openAIMessages: any[] = [];
 
