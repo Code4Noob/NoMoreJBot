@@ -68,7 +68,8 @@ export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
         return {
             count: stickers.length,
             stickers: stickers.slice(0, 50).map((s) => ({
-                stickerId: s.fileId,
+                // 用 short id（file_unique_id），唔好用長 file_id —— 避免 AI 複製時改錯
+                stickerId: s.id,
                 meaning: s.meaning,
                 emoji: s.emoji,
                 pack: s.setName,

@@ -116,12 +116,13 @@ export async function describeSticker(sticker: any, telegram: any): Promise<stri
     return meaning;
 }
 
-export function getCachedStickers(): { fileId: string; meaning: string; emoji: string; setName: string }[] {
+export function getCachedStickers(): { id: string; fileId: string; meaning: string; emoji: string; setName: string }[] {
     const cache = loadStickerCache();
-    const list: { fileId: string; meaning: string; emoji: string; setName: string }[] = [];
-    for (const entry of Object.values(cache)) {
+    const list: { id: string; fileId: string; meaning: string; emoji: string; setName: string }[] = [];
+    for (const [key, entry] of Object.entries(cache)) {
         if (entry?.fileId) {
             list.push({
+                id: key,
                 fileId: entry.fileId,
                 meaning: entry.meaning || "",
                 emoji: entry.emoji || "",
@@ -130,6 +131,15 @@ export function getCachedStickers(): { fileId: string; meaning: string; emoji: s
         }
     }
     return list;
+}
+
+/**
+ * 將 AI 用嘅 short id（file_unique_id / cache key）resolve 返真實 file_id。
+ * 搵唔到就 return null（caller 會 fallback 直接當 file_id 用）。
+ */
+export function resolveStickerId(id: string): string | null {
+    const cache = loadStickerCache();
+    return cache[id]?.fileId || null;
 }
 
 /**

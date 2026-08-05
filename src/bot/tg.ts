@@ -9,7 +9,7 @@ import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../tools/marksix";
 import { weather } from "../tools/weather";
-import { describeSticker, backfillStickerCache } from "../tools/sticker";
+import { describeSticker, backfillStickerCache, resolveStickerId } from "../tools/sticker";
 import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 const fs = require("fs");
@@ -334,9 +334,12 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             const stickerId = stickerMatch[1].trim();
             const cleanReply = reply.replace(stickerRegex, "").trim();
             try {
+                // AI 用嘅係 short id（file_unique_id），resolve 返真實 file_id；
+                // 就算 AI 直接俾咗 file_id 都得（fallback）
+                const realFileId = resolveStickerId(stickerId) || stickerId;
                 // 有文字就出埋文字，之後派貼圖
                 if (cleanReply) await ctx.reply(`${cleanReply}😭🐷`);
-                await ctx.replyWithSticker(stickerId);
+                await ctx.replyWithSticker(realFileId);
             } catch (stickerErr: any) {
                 console.log("🚀 ~ sticker reply error:", stickerErr);
                 await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"} 😭🐷`);
