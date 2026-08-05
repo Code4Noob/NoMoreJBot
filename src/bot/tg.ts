@@ -171,7 +171,7 @@ bot.on("photo", async (ctx: any) => {
         await handleAIRequest(ctx, { prompt: cleanCaption || "幫我睇下呢張圖片", imageData });
     } catch (error: any) {
         console.log("🚀 ~ photo handler error:", error);
-        await ctx.reply(`睇圖出錯: ${error.message} 😭🐷`);
+        await ctx.reply(`睇圖出錯: ${error.message}`);
     }
 });
 
@@ -287,7 +287,7 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             const content = reply.slice(userSkillIdx + "[user_skill]:".length).trim();
             if (content) saveUserSkill(ctx.from.id, content);
             // 剝走 marker 同內容，淨係顯示原本嘅回覆
-            reply = reply.slice(0, userSkillIdx).trim() || "已更新對你嘅專屬人格 😭🐷";
+            reply = reply.slice(0, userSkillIdx).trim() || "已更新對你嘅專屬人格";
         }
 
         fs.appendFile(
@@ -315,20 +315,20 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             const cleanReply = reply.replace(genImageRegex, "").trim();
 
             try {
-                await ctx.reply("畫緊...😭🐷");
+                await ctx.reply("畫緊...");
                 const { text, imageData } = await getGeminiImage({ prompt: imagePrompt });
                 if (imageData) {
                     const buffer = Buffer.from(imageData.data, "base64");
                     await ctx.replyWithPhoto(
                         { source: buffer },
-                        { caption: cleanReply || text ? `${cleanReply || text}😭🐷` : "😭🐷" }
+                        { caption: cleanReply || text ? `${cleanReply || text}` : undefined }
                     );
                 } else {
-                    await ctx.reply(text ? `${text}😭🐷` : "畫唔到😭🐷");
+                    await ctx.reply(text ? `${text}` : "畫唔到");
                 }
             } catch (genError: any) {
                 console.log("🚀 ~ gen image error:", genError);
-                await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message} 😭🐷`);
+                await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message}`);
             }
         } else if (stickerMatch) {
             const stickerId = stickerMatch[1].trim();
@@ -338,19 +338,19 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
                 // 就算 AI 直接俾咗 file_id 都得（fallback）
                 const realFileId = resolveStickerId(stickerId) || stickerId;
                 // 有文字就出埋文字，之後派貼圖
-                if (cleanReply) await ctx.reply(`${cleanReply}😭🐷`);
+                if (cleanReply) await ctx.reply(`${cleanReply}`);
                 await ctx.replyWithSticker(realFileId);
             } catch (stickerErr: any) {
                 console.log("🚀 ~ sticker reply error:", stickerErr);
-                await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"} 😭🐷`);
+                await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
             }
         } else {
-            await ctx.reply(`${reply}😭🐷`);
+            await ctx.reply(`${reply}`);
         }
     } catch (error: any) {
         console.log("🚀 ~ bot.mention ~ error:", error?.message || error);
         const errMsg = error?.response?.data?.error?.message || error?.response?.data || error?.message || "未知錯誤";
-        await ctx.reply(`${errMsg} 😭🐷`).catch(() => {});
+        await ctx.reply(`${errMsg}`).catch(() => {});
     }
 }
 
@@ -497,31 +497,31 @@ bot.command("jp", async (ctx) => {
         await ctx.reply(message);
     } catch (error: any) {
         console.log("🚀 ~ jp error:", error?.response?.data || error.message);
-        await ctx.reply(`JP 查唔到: ${error?.response?.data?.error || error.message} 😭🐷`);
+        await ctx.reply(`JP 查唔到: ${error?.response?.data?.error || error.message}`);
     }
 });
 
 bot.command("draw", async (ctx) => {
     const prompt = ctx.payload.trim();
     if (!prompt) {
-        await ctx.reply("畫咩撚嘢？俾個描述嚟先😭🐷");
+        await ctx.reply("畫咩撚嘢？俾個描述嚟先");
         return;
     }
     try {
-        await ctx.reply("畫緊...😭🐷");
+        await ctx.reply("畫緊...");
         const { text, imageData } = await getGeminiImage({ prompt });
         if (imageData) {
             const buffer = Buffer.from(imageData.data, "base64");
             await ctx.replyWithPhoto(
                 { source: buffer },
-                { caption: text ? `${text}😭🐷` : "😭🐷" }
+                { caption: text ? `${text}` : undefined }
             );
         } else {
-            await ctx.reply(text ? `${text}😭🐷` : "畫唔到😭🐷");
+            await ctx.reply(text ? `${text}` : "畫唔到");
         }
     } catch (error: any) {
         console.log("🚀 ~ bot.command draw ~ error:", error);
-        await ctx.reply(`畫唔到: ${error?.response?.data?.error?.message || error.message} 😭🐷`);
+        await ctx.reply(`畫唔到: ${error?.response?.data?.error?.message || error.message}`);
     }
 });
 
