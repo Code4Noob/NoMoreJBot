@@ -14,7 +14,7 @@ import http from "http";
 import https from "https";
 import os from "os";
 
-function detectTunnelIP(): string {
+export function detectTunnelIP(): string {
     const ifaces = os.networkInterfaces();
     for (const [name, addrs] of Object.entries(ifaces)) {
         if (/^(tun|tap)\d+/.test(name)) {

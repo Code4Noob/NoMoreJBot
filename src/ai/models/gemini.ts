@@ -1,10 +1,45 @@
 import vpnAxios from "../../utils/vpn";
+import { ensureVPN } from "../../utils/vpn-manager";
 import { baseSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 export const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-lite-image";
+
+/** Gemini 地區限制錯誤：user location 唔受支援（FAILED_PRECONDITION 400） */
+function isLocationError(error: any): boolean {
+    const data = error?.response?.data?.error;
+    return (
+        data?.status === "FAILED_PRECONDITION" &&
+        typeof data?.message === "string" &&
+        data.message.includes("User location is not supported")
+    );
+}
+
+/**
+ * 包一層 retry：遇到 Gemini location 限制時自動起 VPN 再試一次。
+ * 每個 request 只會 retry 一次（避免無限 loop）；VPN 起唔到就保留原 error。
+ */
+async function withAutoVPNRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let retried = false;
+    try {
+        return await fn();
+    } catch (error: any) {
+        if (!retried && isLocationError(error)) {
+            retried = true;
+            console.log("🌍 Gemini location 限制（user location 唔受支援）→ 自動啟動 VPN 重試...");
+            try {
+                await ensureVPN();
+            } catch (vpnErr: any) {
+                console.log("❌ VPN 自動啟動失敗:", vpnErr.message);
+                throw error; // 保留原本嘅 location error
+            }
+            return await fn(); // 重試一次；再失敗就 throw 重試嘅 error
+        }
+        throw error;
+    }
+}
 
 interface ToolCall {
     id: string;
@@ -130,10 +165,13 @@ export async function getGeminiResponse({
     }
 
     try {
-        const { data } = await vpnAxios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-            requestBody
-        );
+        const data = await withAutoVPNRetry(async () => {
+            const res = await vpnAxios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                requestBody
+            );
+            return res.data;
+        });
 
         const candidate = data.candidates?.[0];
         if (!candidate) {
@@ -217,10 +255,13 @@ export async function getGeminiImage({
     };
 
     try {
-        const { data } = await vpnAxios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-            requestBody
-        );
+        const data = await withAutoVPNRetry(async () => {
+            const res = await vpnAxios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                requestBody
+            );
+            return res.data;
+        });
 
         const candidate = data.candidates?.[0];
         if (!candidate) {

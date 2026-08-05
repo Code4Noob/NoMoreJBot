@@ -48,7 +48,8 @@ function finalize() {
         // 攞 tunnel subnet（例如 10.8.8.0/24）——用 subnet rule，reconnect 派新 IP 都唔使改
         let tunNet = "";
         try {
-            tunNet = execSync(`ip route show dev ${link} | grep proto kernel | awk '{print $1}' | head -1`, { encoding: "utf-8" }).trim();
+            // grep 個 pattern 要加引號，唔係 "kernel" 會被當成檔案名
+            tunNet = execSync(`ip route show dev ${link} | grep "proto kernel" | awk '{print $1}' | head -1`, { encoding: "utf-8" }).trim();
         } catch (_) { /* ignore */ }
         if (!tunNet) {
             tunNet = tunIP.split(".").slice(0, 3).join(".") + ".0/24";

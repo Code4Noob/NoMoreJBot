@@ -142,6 +142,29 @@ sudo node scripts/vpn-connect.js
 - `utils/vpn.ts` 自動偵測 tun interface IP，tunnel 未起就 fallback 普通 axios
 - 唔使設任何 VPN env var
 
+### 自動起 VPN（遇到 Gemini location 限制時）
+
+Gemini 喺某啲地區（例如 HK）會回傳 `User location is not supported`
+（FAILED_PRECONDITION 400）。Bot 遇到呢個 error 時會喺 terminal 問你
+sudo password，起咗 VPN 再重試一次。
+
+流程：
+
+1. Gemini 回傳 location error
+2. `ensureVPN()` 偵測冇 tun interface
+3. Bot 喺 terminal 顯示「🔐 要啟動 VPN — 請輸入 sudo password」
+4. 你喺 terminal 入 sudo password（sudo 自己讀，echo 隱藏，code 掂唔到，
+   亦唔會儲低）
+5. tunnel 起咗 → 自動重試 API request（經 VPN 出街）
+6. 取消 / 失敗會 cooldown 5 分鐘，避免不停問
+
+VPN 已經行緊（有 tun interface）時唔會再問，直接重試。
+Bot 唔喺 terminal 跑（例如 systemd / 背景）時會提示手動起：
+`sudo node scripts/vpn-connect.js`。
+
+> 如果你之前用舊版 `setup-vpn-autostart.sh` 裝過 passwordless rule，可以移除：
+> `sudo rm -f /etc/sudoers.d/nomorejbot-vpn`
+
 ## 聊天歷史
 
 所有群組訊息會寫入 `chat/history/{chatId}.txt`，@bot 時會自動攞最近嘅行數做 context。
