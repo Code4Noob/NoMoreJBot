@@ -9,6 +9,7 @@ import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../tools/marksix";
 import { weather } from "../tools/weather";
+import { describeSticker, backfillStickerCache } from "../tools/sticker";
 import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 const fs = require("fs");
@@ -16,6 +17,11 @@ const path = require("path");
 import axios from "axios";
 
 const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
+
+// 啟動時為舊 sticker cache entry 補返 fileId（俾 get_cached_stickers 用到）
+backfillStickerCache(bot.telegram).catch((err) =>
+    console.log("⚠️ sticker cache backfill 失敗:", err?.message || err)
+);
 
 // File-based chat history: chat/history/{chatId}.txt
 const HISTORY_DIR = path.resolve(process.cwd(), "chat/history");
@@ -198,6 +204,13 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
                 } catch (err: any) {
                     console.log("⚠️ reply-to 圖片下載失敗:", err?.message || err);
                 }
+            } else if (replyTo.sticker) {
+                try {
+                    const stickerMeaning = await describeSticker(replyTo.sticker, ctx.telegram);
+                    replyText = `[引用咗 ${replyName} 嘅貼圖]: ${stickerMeaning}\n\n`;
+                } catch (err: any) {
+                    console.log("⚠️ reply-to 貼圖辨識失敗:", err?.message || err);
+                }
             }
         }
 
@@ -293,6 +306,10 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         const genImageRegex = /(?:\*\*\*)?\s*gen image\s*(?:\*\*\*)?\s+(.+)/i;
         const genImageMatch = reply.match(genImageRegex);
 
+        // 😭🐷 檢查 AI 回覆是否包含 [sticker]: <stickerId> —— bot 自動派嗰張貼圖
+        const stickerRegex = /\[sticker\]:\s*([A-Za-z0-9_\-]+)/i;
+        const stickerMatch = reply.match(stickerRegex);
+
         if (genImageMatch) {
             const imagePrompt = genImageMatch[1].trim();
             const cleanReply = reply.replace(genImageRegex, "").trim();
@@ -312,6 +329,17 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             } catch (genError: any) {
                 console.log("🚀 ~ gen image error:", genError);
                 await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message} 😭🐷`);
+            }
+        } else if (stickerMatch) {
+            const stickerId = stickerMatch[1].trim();
+            const cleanReply = reply.replace(stickerRegex, "").trim();
+            try {
+                // 有文字就出埋文字，之後派貼圖
+                if (cleanReply) await ctx.reply(`${cleanReply}😭🐷`);
+                await ctx.replyWithSticker(stickerId);
+            } catch (stickerErr: any) {
+                console.log("🚀 ~ sticker reply error:", stickerErr);
+                await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"} 😭🐷`);
             }
         } else {
             await ctx.reply(`${reply}😭🐷`);
@@ -343,12 +371,27 @@ bot.on("text", (ctx: any, next: any) => {
 });
 
 // Listen to all messages to build file-based chat history (requires bot privacy mode disabled)
-bot.on("message", (ctx: any, next: any) => {
+bot.on("message", async (ctx: any, next: any) => {
     const chatId = ctx.chat?.id;
-    const msgText = ctx.message?.text;
-    if (!chatId || !msgText) return next?.();
+    if (!chatId) return next?.();
     const isBot = ctx.message.from?.id === ctx.botInfo?.id;
     const name = isBot ? "Bot" : (ctx.message.from?.first_name || ctx.message.from?.username || "Unknown");
+
+    // 貼圖：辨識內容（有 cache）後寫入 history，等 AI 之後睇得明貼圖講咩
+    const sticker = ctx.message?.sticker;
+    if (sticker) {
+        try {
+            const meaning = await describeSticker(sticker, ctx.telegram);
+            // 標明 (貼圖)，等 AI 讀 history 時知呢行係貼圖內容而唔係普通文字
+            appendToHistory(chatId, name, `(貼圖) ${meaning}`);
+        } catch (err: any) {
+            console.log("❌ sticker history 失敗:", err?.message || err);
+        }
+        return next?.();
+    }
+
+    const msgText = ctx.message?.text;
+    if (!msgText) return next?.();
     appendToHistory(chatId, name, msgText);
     next?.();
 });

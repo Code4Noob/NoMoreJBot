@@ -99,8 +99,9 @@ function convertToGeminiMessages(messages: any[]): any[] {
             }
         } else if (msg.role === "tool") {
             // Convert OpenAI-style tool result to Gemini functionResponse
+            // Gemini 唔支援 role "function"，function response 要用 role "user" + functionResponse part
             geminiMessages.push({
-                role: "function",
+                role: "user",
                 parts: [{
                     functionResponse: {
                         name: msg.name,
@@ -126,6 +127,14 @@ const geminiToolList = [
                 }
             },
             required: ["url"],
+        }
+    },
+    {
+        name: "get_cached_stickers",
+        description: "Get the list of cached stickers (stickerId, meaning, emoji) that the bot can send. Use a returned stickerId in the reply as [sticker]: <stickerId> to send that sticker.",
+        parameters: {
+            type: "object",
+            properties: {},
         }
     }
 ];

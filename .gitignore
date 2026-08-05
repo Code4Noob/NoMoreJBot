@@ -12,6 +12,7 @@ dist
 log/
 
 chat/history/*
+chat/sticker-cache.json
 
 vpn/*
 

@@ -8,6 +8,8 @@ Telegram bot（Telegraf）整合多個 AI model，支援圖片生成 / 圖片辨
 - **多 AI Provider** — 可切換 Gemini / DeepSeek / GPT
 - **圖片生成** — AI 回覆含 `gen image <描述>` 就自動生圖
 - **圖片辨識** — 傳相 + @bot caption 即分析
+- **貼圖辨識** — 貼圖內容自動分析（靜態用原圖，animated/video 用 thumbnail 預覽）+ 本地 cache（`chat/sticker-cache.json`），寫入聊天歷史俾 AI 睇
+- **貼圖回覆** — AI 回覆含 `[sticker]: <id>` 就自動派貼圖（AI 可 call tool `get_cached_stickers` 攞可用貼圖）
 - **回覆引用** — reply 一條訊息 + @bot，可讀埋被引用嗰條（text / 圖片）
 - **可切換 skillset** — base skill + 每個 user 獨有嘅人格
 - **聊天歷史** — file-based（`chat/history/{chatId}.txt`）

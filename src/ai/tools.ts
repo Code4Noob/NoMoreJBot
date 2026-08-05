@@ -1,4 +1,5 @@
 import vpnAxios from "../utils/vpn";
+import { getCachedStickers } from "../tools/sticker";
 
 // OpenAI-format tool list（DeepSeek / GPT 用）
 export const toolList = [
@@ -16,6 +17,17 @@ export const toolList = [
                     }
                 },
                 required: ["url"],
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_cached_stickers",
+            description: "Get the list of cached stickers (stickerId, meaning, emoji) that the bot can send. Use a returned stickerId in the reply as [sticker]: <stickerId> to send that sticker.",
+            parameters: {
+                type: "object",
+                properties: {},
             }
         }
     }
@@ -50,5 +62,17 @@ export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
                 textContent: "Error while trying to get body text",
             };
         }
-    }
+    },
+    "get_cached_stickers": async () => {
+        const stickers = getCachedStickers();
+        return {
+            count: stickers.length,
+            stickers: stickers.slice(0, 50).map((s) => ({
+                stickerId: s.fileId,
+                meaning: s.meaning,
+                emoji: s.emoji,
+                pack: s.setName,
+            })),
+        };
+    },
 };
