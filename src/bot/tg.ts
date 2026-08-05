@@ -178,7 +178,12 @@ bot.on("photo", async (ctx: any) => {
 // 共用 AI 對話流程（mention / reply-to-bot / photo 都用）
 async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: { mimeType: string; data: string } | null }) {
     try {
-        const prompt = (opts?.prompt ?? ctx.message.text.replace(`@${process.env.BOT_NAME}`, "")).trim();
+        // 支援非文字訊息（例如 sticker reply）——冇 text 就用預設 prompt
+        const rawText = ctx.message.text || "";
+        let prompt = (opts?.prompt ?? rawText.replace(`@${process.env.BOT_NAME}`, "")).trim();
+        if (!prompt && ctx.message.sticker) {
+            prompt = "（用貼圖回覆咗你）";
+        }
         const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
         const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
         const chatId = ctx.chat.id;
@@ -214,9 +219,20 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             }
         }
 
+        // 如果 current message 本身係貼圖（user reply bot with sticker），加入貼圖意思
+        let currentStickerText = "";
+        if (ctx.message?.sticker) {
+            try {
+                const meaning = await describeSticker(ctx.message.sticker, ctx.telegram);
+                currentStickerText = `[你收到一張貼圖（${userName}）]: ${meaning}\n\n`;
+            } catch (err: any) {
+                console.log("⚠️ current sticker 辨識失敗:", err?.message || err);
+            }
+        }
+
         // Build recent messages context from file-based history
         const recentHistory = getRecentHistory(chatId);
-        const baseMsg = `${replyText}[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        const baseMsg = `${replyText}${currentStickerText}[Chat: ${chatName}] [${userName}]: ${prompt}`;
         let userMessage = "";
         if (recentHistory) {
             userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n${baseMsg}`;
@@ -397,6 +413,17 @@ bot.on("message", async (ctx: any, next: any) => {
     if (!msgText) return next?.();
     appendToHistory(chatId, name, msgText);
     next?.();
+});
+
+// user reply bot with sticker -> 都要 AI 回應（認得到張貼圖）
+bot.on("sticker", (ctx: any, next: any) => {
+    const replyTo = ctx.message?.reply_to_message;
+    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    if (repliedToBot) {
+        handleAIRequest(ctx);
+    } else {
+        next?.();
+    }
 });
 
 // Actions
