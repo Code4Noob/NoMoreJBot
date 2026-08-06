@@ -1,5 +1,5 @@
-import vpnAxios from "../utils/vpn";
 import { getCachedStickers } from "../tools/sticker";
+import { crawlUrlToText } from "../tools/crawler";
 
 // OpenAI-format tool list（DeepSeek / GPT 用）
 export const toolList = [
@@ -7,7 +7,7 @@ export const toolList = [
         type: "function",
         function: {
             name: "get_url_text_content",
-            description: "Get the content of a https website specified by an URL in plain text format",
+            description: "Get the main text content of a website specified by an URL (renders JS pages)",
             parameters: {
                 type: "object",
                 properties: {
@@ -37,25 +37,9 @@ export const toolList = [
 export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
     "get_url_text_content": async ({ url }: { url: string }) => {
         try {
-            const response = await vpnAxios.get(url);
-            const $ = (await import("cheerio")).load(response.data);
-            $("script, style").remove();
-            let visibleText = "";
-            function extractText(element: any) {
-                $(element).contents().each((_: any, el: any) => {
-                    if (el.type === "text") {
-                        visibleText += $(el).text().trim() + " ";
-                    } else if (el.type === "tag" && !["script", "style"].includes(el.name)) {
-                        extractText(el);
-                    }
-                });
-            }
-            extractText($("body"));
-            visibleText = visibleText.replace(/\s+/g, " ").trim();
-            return {
-                siteTitle: $("title").text(),
-                textContent: visibleText,
-            };
+            // Playwright 版：真 browser 渲染（支援 JS / SPA）+ 抽正文文字
+            const { title, text } = await crawlUrlToText(url);
+            return { siteTitle: title, textContent: text };
         } catch (error) {
             return {
                 siteTitle: "Error while trying to get title",

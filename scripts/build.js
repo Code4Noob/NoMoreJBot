@@ -24,7 +24,7 @@ build({
   bundle: true,
   platform: "node",
   target: "esnext",
-  external: ['undici', 'node-fetch'],
+  external: ['undici', 'node-fetch', 'playwright', 'playwright-core'],
 
   loader: { ".ts": "ts" },
   watch: args.watch,

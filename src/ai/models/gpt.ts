@@ -71,6 +71,7 @@ export async function getGptResponse({
         finishReason: data.choices[0].finish_reason,
         tokens: data.usage?.total_tokens ?? 0,
         toolCalls: msg?.tool_calls?.length ?? 0,
+        toolNames: msg?.tool_calls?.map((tc: any) => tc.function?.name),
         message: msg?.content || null,
     });
 

@@ -67,6 +67,7 @@ export async function getDeepSeekResponse({
             finishReason: choice?.finish_reason,
             tokens: data.usage?.total_tokens ?? 0,
             toolCalls: toolCalls?.length ?? 0,
+            toolNames: toolCalls?.map((tc: any) => tc.function.name),
             message: msg?.content || null,
         });
 

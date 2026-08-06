@@ -149,7 +149,7 @@ function convertToGeminiMessages(messages: any[]): any[] {
 const geminiToolList = [
     {
         name: "get_url_text_content",
-        description: "Get the content of a https website specified by an URL in plain text format",
+        description: "Get the main text content of a website specified by an URL (renders JS pages)",
         parameters: {
             type: "object",
             properties: {
@@ -261,6 +261,7 @@ export async function getGeminiResponse({
             finishReason: candidate.finishReason,
             tokens: totalTokens,
             toolCalls: toolCalls.length,
+            toolNames: toolCalls.map((tc) => tc.function.name),
             message,
         });
 
