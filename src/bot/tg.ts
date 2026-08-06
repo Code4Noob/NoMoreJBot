@@ -322,9 +322,9 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         const genImageRegex = /(?:\*\*\*)?\s*gen image\s*(?:\*\*\*)?\s+(.+)/i;
         const genImageMatch = reply.match(genImageRegex);
 
-        // 😭🐷 檢查 AI 回覆是否包含 [sticker]: <stickerId> —— bot 自動派嗰張貼圖
-        const stickerRegex = /\[sticker\]:\s*([A-Za-z0-9_\-]+)/i;
-        const stickerMatch = reply.match(stickerRegex);
+        // 檢查 AI 回覆是否包含 [sticker]: <stickerId>（支援多張）—— bot 自動派貼圖
+        const stickerRegex = /\[sticker\]:\s*([A-Za-z0-9_\-]+)/gi;
+        const stickerIds = [...reply.matchAll(stickerRegex)].map((m) => m[1].trim());
 
         if (genImageMatch) {
             const imagePrompt = genImageMatch[1].trim();
@@ -346,16 +346,22 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
                 console.log("🚀 ~ gen image error:", genError);
                 await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message}`);
             }
-        } else if (stickerMatch) {
-            const stickerId = stickerMatch[1].trim();
+        } else if (stickerIds.length > 0) {
             const cleanReply = reply.replace(stickerRegex, "").trim();
             try {
-                // AI 用嘅係 short id（file_unique_id），resolve 返真實 file_id；
-                // 就算 AI 直接俾咗 file_id 都得（fallback）
-                const realFileId = resolveStickerId(stickerId) || stickerId;
-                // 有文字就出埋文字，之後派貼圖
+                // 有文字就出埋文字
                 if (cleanReply) await ctx.reply(`${cleanReply}`);
-                await ctx.replyWithSticker(realFileId);
+                // 逐張派（去重 + 最多 5 張避免洗板），resolve 返真實 file_id
+                const toSend = [...new Set(stickerIds)].slice(0, 5);
+                for (const stickerId of toSend) {
+                    try {
+                        const realFileId = resolveStickerId(stickerId) || stickerId;
+                        await ctx.replyWithSticker(realFileId);
+                    } catch (stickerErr: any) {
+                        console.log("🚀 ~ sticker reply error:", stickerErr);
+                        await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
+                    }
+                }
             } catch (stickerErr: any) {
                 console.log("🚀 ~ sticker reply error:", stickerErr);
                 await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
