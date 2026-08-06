@@ -11,7 +11,8 @@
  *   - single-flight：多個 request 同時觸發都只會起一次 VPN
  *   - 失敗 / 取消後 cooldown（5 分鐘），避免不停問
  *   - tunnel 已經起咗就直接 return，唔會再 spawn
- *   - 唔係 terminal 環境（例如 systemd / 背景）會直接失敗，提示手動起 VPN
+ *   - 設咗 SUDO_PASSWORD（.env）-> 非互動重啟（sudo -S 由 stdin 餵密碼）
+ *   - 冇設 SUDO_PASSWORD -> stdio inherit 喺 terminal 互動問；唔係 terminal 就提示手動起
  */
 import { spawn } from "child_process";
 import fs from "fs";
@@ -52,11 +53,13 @@ export function isTunnelUp(): boolean {
 
 function runVPNConnect(): Promise<void> {
     return new Promise((resolve, reject) => {
-        // 要問 sudo password：唔係 terminal 就冇得互動問
-        if (!process.stdin.isTTY) {
+        const sudoPassword = process.env.SUDO_PASSWORD;
+
+        // 冇 env 密碼就要喺 terminal 互動問
+        if (!sudoPassword && !process.stdin.isTTY) {
             reject(
                 new Error(
-                    "冇 terminal 可以問 sudo password — 請手動執行: sudo node scripts/vpn-connect.js"
+                    "冇 terminal 問 sudo password，又冇設 SUDO_PASSWORD — 請手動執行: sudo node scripts/vpn-connect.js"
                 )
             );
             return;
@@ -66,15 +69,25 @@ function runVPNConnect(): Promise<void> {
         const repoRoot = findRepoRoot();
         const scriptPath = path.join(repoRoot, "scripts", "vpn-connect.js");
 
-        console.log(
-            "🔐 要啟動 VPN — 請喺呢個 terminal 輸入 sudo password（只今次用，唔會儲低）"
-        );
-
-        // stdio inherit：sudo 直接喺 terminal 問密碼（echo 隱藏），code 掂唔到密碼
-        const proc = spawn("sudo", [nodeBin, scriptPath], {
-            cwd: repoRoot,
-            stdio: "inherit",
-        });
+        let proc;
+        if (sudoPassword) {
+            // 用 .env 密碼非互動：sudo -S 由 stdin 讀密碼（唔會 log / 儲低，淨係餵俾 sudo）
+            proc = spawn("sudo", ["-S", "-p", "", nodeBin, scriptPath], {
+                cwd: repoRoot,
+                stdio: ["pipe", "inherit", "inherit"],
+            });
+            proc.stdin.write(sudoPassword + "\n");
+            proc.stdin.end();
+        } else {
+            // stdio inherit：sudo 直接喺 terminal 問密碼（echo 隱藏），code 掂唔到密碼
+            console.log(
+                "🔐 要啟動 VPN — 請喺呢個 terminal 輸入 sudo password（只今次用，唔會儲低）"
+            );
+            proc = spawn("sudo", [nodeBin, scriptPath], {
+                cwd: repoRoot,
+                stdio: "inherit",
+            });
+        }
 
         proc.on("error", (err) => reject(err));
 
