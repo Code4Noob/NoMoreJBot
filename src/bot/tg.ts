@@ -1,7 +1,7 @@
 import { Context, Input, Markup, Telegraf } from "telegraf";
 import { User } from "../models/user";
 import { Chat } from "../models/chat";
-import { dbConnect, dbDisconnect } from "../db";
+import { dbConnect, dbDisconnect, dbHealthCheck } from "../db";
 import { from, validateJCount } from "../tools/date";
 
 import { v4 as uuidv4 } from "uuid";
@@ -10,6 +10,7 @@ import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../tools/marksix";
 import { weather } from "../tools/weather";
 import { describeSticker, backfillStickerCache, resolveStickerId } from "../tools/sticker";
+import vpnAxios, { detectTunnelIP } from "../utils/vpn";
 import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 const fs = require("fs");
@@ -119,8 +120,41 @@ bot.start(async (ctx) => {
     await initUser(ctx);
     await ctx.reply("Hello " + ctx.from.first_name + "!");
 });
+function formatUptime(seconds: number): string {
+    const s = Math.floor(seconds);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+// /help -> Health Check（回報 bot / AI / VPN 狀態）
 bot.help(async (ctx) => {
-    await ctx.reply("Nothing to help");
+    const aiProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
+    const aiModel =
+        aiProvider === "deepseek"
+            ? process.env.DEEPSEEK_MODEL || "deepseek-chat"
+            : aiProvider === "gpt"
+            ? process.env.AZURE_OPENAI_URL?.match(/deployments\/([^/?]+)/)?.[1] || "gpt"
+            : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+
+    const lines: string[] = [`🧪 Health Check（uptime ${formatUptime(process.uptime())}）`];
+    lines.push(`• AI: ${aiProvider} / ${aiModel}`);
+    const tunIP = detectTunnelIP();
+    lines.push(tunIP ? `• VPN: ✅ up（${tunIP}）` : "• VPN: ⚠️ down");
+    lines.push(`• DB: ${await dbHealthCheck()}`);
+
+    try {
+        // 任何 HTTP response（包括 404）都當 reachable；timeout 8 秒
+        await vpnAxios.get("https://generativelanguage.googleapis.com/", {
+            timeout: 8000,
+            validateStatus: () => true,
+        });
+        lines.push("• Gemini endpoint: ✅ reachable");
+    } catch (err: any) {
+        lines.push(`• Gemini endpoint: ⚠️ ${err?.message || "unreachable"}`);
+    }
+    await ctx.reply(lines.join("\n"));
 });
 
 // Commands
@@ -133,6 +167,7 @@ bot.command("quit", async (ctx) => {
         await ctx.reply("踢你老母臭");
     }
 });
+
 bot.command("j", async (ctx) => {
     await ctx.reply(
         "Jed?",
@@ -142,11 +177,7 @@ bot.command("j", async (ctx) => {
         ])
     );
 });
-bot.command("picture", async (ctx) => {
-    await ctx.replyWithPhoto(
-        Input.fromURL(`https://picsum.photos/1024/768/?${uuidv4()}`)
-    );
-});
+
 // Handle photos with caption mentioning the bot
 bot.on("photo", async (ctx: any) => {
     const caption = ctx.message?.caption || "";
@@ -572,10 +603,6 @@ cron.schedule(
         timezone: "Asia/Hong_Kong", // Replace with your timezone
     }
 );
-
-bot.hears(/水戶/i, async (ctx) => {
-    await ctx.reply(`唔預你住`);
-});
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));

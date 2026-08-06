@@ -1,5 +1,5 @@
 start - Start the bot
-help - Show help message
+help - Bot health check（AI / VPN / Gemini 狀態）
 quit - Admin only: Make bot leave the group
 j - Track your "Jed day" (inline buttons)
 picture - Send a random picture
