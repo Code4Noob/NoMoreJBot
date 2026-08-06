@@ -1,5 +1,5 @@
 import vpnAxios from "../../utils/vpn";
-import { ensureVPN } from "../../utils/vpn-manager";
+import { ensureVPN, restartVPN, isTunnelUp } from "../../utils/vpn-manager";
 import { baseSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
 
@@ -17,23 +17,55 @@ function isLocationError(error: any): boolean {
     );
 }
 
+/** 連線層錯誤（VPN stale / 網絡問題）：ETIMEDOUT / ECONNRESET / ECONNREFUSED 等 */
+function isConnectionError(error: any): boolean {
+    const code = error?.code || error?.errno;
+    if (typeof code === "string") {
+        return [
+            "ETIMEDOUT",
+            "ECONNRESET",
+            "ECONNREFUSED",
+            "ENETUNREACH",
+            "EHOSTUNREACH",
+            "EAI_AGAIN",
+            "EADDRNOTAVAIL",
+            "EPIPE",
+        ].includes(code);
+    }
+    const msg = error?.message || "";
+    return /connect ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|network is unreachable|timed out/i.test(
+        msg
+    );
+}
+
 /**
- * 包一層 retry：遇到 Gemini location 限制時自動起 VPN 再試一次。
- * 每個 request 只會 retry 一次（避免無限 loop）；VPN 起唔到就保留原 error。
+ * 包一層 retry：遇到 Gemini location 限制 / 連線失敗時自動起（或重啟）VPN 再試一次。
+ * 每個 request 只會 retry 一次（避免無限 loop）；VPN 搞唔掂就保留原 error。
  */
 async function withAutoVPNRetry<T>(fn: () => Promise<T>): Promise<T> {
     let retried = false;
     try {
         return await fn();
     } catch (error: any) {
-        if (!retried && isLocationError(error)) {
+        if (!retried && (isLocationError(error) || isConnectionError(error))) {
             retried = true;
-            console.log("🌍 Gemini location 限制（user location 唔受支援）→ 自動啟動 VPN 重試...");
+            const isLocation = isLocationError(error);
+            const isConn = isConnectionError(error);
+            if (isLocation) {
+                console.log("🌍 Gemini location 限制（user location 唔受支援）→ 自動啟動 VPN 重試...");
+            } else if (isConn) {
+                console.log("⚠️ Gemini 連線失敗 → 自動重啟 VPN 重試...");
+            }
             try {
-                await ensureVPN();
+                // 連線 fail 而 tunnel 仲 up -> 好可能 stale，強制重啟；否則正常起/補起
+                if (isConn && isTunnelUp()) {
+                    await restartVPN();
+                } else {
+                    await ensureVPN();
+                }
             } catch (vpnErr: any) {
                 console.log("❌ VPN 自動啟動失敗:", vpnErr.message);
-                throw error; // 保留原本嘅 location error
+                throw error; // 保留原本 error
             }
             return await fn(); // 重試一次；再失敗就 throw 重試嘅 error
         }

@@ -20,8 +20,10 @@ import { detectTunnelIP } from "./vpn";
 
 let startPromise: Promise<void> | null = null;
 let lastFailedAt = 0;
+let lastRestartAt = 0;
 
 const COOLDOWN_MS = 5 * 60 * 1000; // 失敗後 5 分鐘內唔再自動試
+const RESTART_COOLDOWN_MS = 3 * 60 * 1000; // 重啟 cooldown，避免無限重啟
 const POLL_INTERVAL_MS = 1000;
 const POLL_TIMEOUT_MS = 20 * 1000;
 
@@ -101,7 +103,27 @@ async function waitForTunnel(): Promise<void> {
  */
 export async function ensureVPN(): Promise<void> {
     if (isTunnelUp()) return;
+    return startVPN();
+}
 
+/**
+ * 強制重啟 VPN：即使 tunnel 仲 up（可能 stale / 壞咗）都會殺舊 + 重新連線。
+ * 用喺穿過 tunnel 嘅連線 fail（ETIMEDOUT / ECONNRESET 等）嘅情況。
+ * 同樣有 single-flight + cooldown。
+ */
+export async function restartVPN(): Promise<void> {
+    const now = Date.now();
+    // 3 分鐘內唔好不停重啟（tunnel 持續壞嘅時候都只會間中試）
+    if (now - lastRestartAt < RESTART_COOLDOWN_MS) {
+        console.log("⏳ VPN 啱啱先重啟過，今次唔重啟（cooldown 中）");
+        return;
+    }
+    lastRestartAt = now;
+    console.log("🔄 強制重啟 VPN（殺舊 openvpn + 重新連線）...");
+    return startVPN();
+}
+
+async function startVPN(): Promise<void> {
     const now = Date.now();
     if (now - lastFailedAt < COOLDOWN_MS) {
         throw new Error("VPN auto-start 喺 cooldown 中（之前啟動失敗咗）");
