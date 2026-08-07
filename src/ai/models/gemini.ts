@@ -232,6 +232,8 @@ export async function getGeminiResponse({
         let imageData: { mimeType: string; data: string } | null = null;
 
         for (const part of parts) {
+            // 跳過 Gemini 思考內容（thought），唔好將 reasoning 當正文
+            if (part.thought) continue;
             if (part.functionCall) {
                 toolCalls.push({
                     id: part.functionCall.name,
@@ -316,6 +318,8 @@ export async function getGeminiImage({
         let imageData: { mimeType: string; data: string } | null = null;
 
         for (const part of parts) {
+            // 跳過 Gemini 思考內容（thought），唔好將 reasoning 當正文
+            if (part.thought) continue;
             if (part.text) text += part.text + "\n";
             if (part.inlineData && part.inlineData.mimeType?.startsWith("image/")) {
                 imageData = {

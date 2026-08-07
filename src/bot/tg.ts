@@ -128,6 +128,12 @@ function formatUptime(seconds: number): string {
     return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
+// Telegram photo caption 上限 1024 chars，截斷避免 "caption is too long"
+const MAX_CAPTION = 1024;
+function truncateCaption(s: string): string {
+    return s.length > MAX_CAPTION ? s.slice(0, MAX_CAPTION) + "…" : s;
+}
+
 // /help -> Health Check（回報 bot / AI / VPN 狀態）
 bot.help(async (ctx) => {
     const aiProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
@@ -368,7 +374,7 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
                     const buffer = Buffer.from(imageData.data, "base64");
                     await ctx.replyWithPhoto(
                         { source: buffer },
-                        { caption: cleanReply || text ? `${cleanReply || text}` : undefined }
+                        { caption: cleanReply || text ? truncateCaption(`${cleanReply || text}`) : undefined }
                     );
                 } else {
                     await ctx.reply(text ? `${text}` : "畫唔到");
@@ -578,7 +584,7 @@ bot.command("draw", async (ctx) => {
             const buffer = Buffer.from(imageData.data, "base64");
             await ctx.replyWithPhoto(
                 { source: buffer },
-                { caption: text ? `${text}` : undefined }
+                { caption: text ? truncateCaption(`${text}`) : undefined }
             );
         } else {
             await ctx.reply(text ? `${text}` : "畫唔到");
