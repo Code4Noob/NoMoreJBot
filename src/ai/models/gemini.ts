@@ -281,16 +281,23 @@ export async function getGeminiResponse({
 
 export async function getGeminiImage({
     prompt,
+    inputImage,
 }: {
     prompt: string;
+    inputImage?: { mimeType: string; data: string } | null;
 }): Promise<{ text: string | null; imageData: { mimeType: string; data: string } | null }> {
     const IMAGE_MODEL = GEMINI_IMAGE_MODEL;
+
+    // 編輯相：將 input 相加做第一個 part，再跟住編輯指示文字
+    const parts: any[] = [];
+    if (inputImage) parts.push({ inlineData: inputImage });
+    parts.push({ text: prompt });
 
     const requestBody: any = {
         contents: [
             {
                 role: "user",
-                parts: [{ text: prompt }],
+                parts,
             },
         ],
         generationConfig: {

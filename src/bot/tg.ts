@@ -234,6 +234,21 @@ async function sendStickers(ctx: any, stickerIds: string[]): Promise<void> {
     }
 }
 
+// 將回覆按 [section] 拆開，逐段送出（好似真人分幾句打）；最多 8 段避免洗板
+async function sendSectioned(ctx: any, text: string): Promise<void> {
+    const sections = text
+        .split(/\[section\]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (sections.length <= 1) {
+        await ctx.reply(`${text}`);
+        return;
+    }
+    for (const s of sections.slice(0, 8)) {
+        await ctx.reply(`${s}`);
+    }
+}
+
 // 共用 AI 對話流程（mention / reply-to-bot / photo 都用）
 async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: { mimeType: string; data: string } | null }) {
     try {
@@ -377,10 +392,15 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
             appendToHistory(chatId, "Bot", reply);
         }
 
-        // 🎨 檢查 AI 回覆是否包含圖片生成指令
-        // 匹配 "gen image <描述>" (skill.md 格式) 或 "***gen image*** <描述>" (舊格式)
+        // 🎨 檢查 AI 回覆是否包含圖片生成 / 編輯指令
+        // "gen image edit <描述>" = 編輯相（用 input 相）；"gen image <描述>" = 由零生圖
+        const genImageEditRegex = /(?:\*\*\*)?\s*gen image edit\s*(?:\*\*\*)?\s+(.+)/i;
         const genImageRegex = /(?:\*\*\*)?\s*gen image\s*(?:\*\*\*)?\s+(.+)/i;
-        const genImageMatch = reply.match(genImageRegex);
+        const genImageEditMatch = reply.match(genImageEditRegex);
+        const genImageMatch = genImageEditMatch || reply.match(genImageRegex);
+        const isEdit = !!genImageEditMatch;
+        // 編輯要用嘅 input 相：user 今次 send 嘅相 / reply 緊嘅相
+        const inputPhoto = opts?.imageData ?? replyImageData;
 
         // 檢查 AI 回覆是否包含 [sticker]: <stickerId>（支援多張）—— bot 自動派貼圖
         const stickerRegex = /\[sticker\]:\s*([A-Za-z0-9_\-]+)/gi;
@@ -390,36 +410,41 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 
         if (genImageMatch) {
             const imagePrompt = genImageMatch[1].trim();
-            const cleanReply = replyNoStickers.replace(genImageRegex, "").trim();
+            const cleanReply = isEdit
+                ? replyNoStickers.replace(genImageEditRegex, "").trim()
+                : replyNoStickers.replace(genImageRegex, "").trim();
 
             try {
-                await ctx.reply("畫緊...");
-                const { text, imageData } = await getGeminiImage({ prompt: imagePrompt });
+                await ctx.reply(isEdit ? "執緊...📸" : "畫緊...");
+                const { text, imageData } = await getGeminiImage({
+                    prompt: imagePrompt,
+                    inputImage: isEdit ? inputPhoto : undefined,
+                });
                 const caption = cleanReply || text ? truncateCaption(`${cleanReply || text}`) : undefined;
                 if (imageData) {
                     const buffer = Buffer.from(imageData.data, "base64");
                     await ctx.replyWithPhoto({ source: buffer }, { caption });
                 } else {
-                    await ctx.reply(text ? `${text}` : "畫唔到");
+                    await ctx.reply(text ? `${text}` : (isEdit ? "執唔到" : "畫唔到"));
                 }
                 // gen image 之餘都派埋 sticker（如果 AI 同時出咗）
                 if (stickerIds.length > 0) await sendStickers(ctx, stickerIds);
             } catch (genError: any) {
                 console.log("🚀 ~ gen image error:", genError);
-                await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message}`);
+                await ctx.reply(`${isEdit ? "執相" : "畫"}唔到: ${genError?.response?.data?.error?.message || genError.message}`);
             }
         } else if (stickerIds.length > 0) {
             const cleanReply = replyNoStickers.trim();
             try {
-                // 有文字就出埋文字
-                if (cleanReply) await ctx.reply(`${cleanReply}`);
+                // 有文字就出埋文字（支援 [section] 分段）
+                if (cleanReply) await sendSectioned(ctx, cleanReply);
                 await sendStickers(ctx, stickerIds);
             } catch (stickerErr: any) {
                 console.log("🚀 ~ sticker reply error:", stickerErr);
                 await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
             }
         } else {
-            await ctx.reply(`${reply}`);
+            await sendSectioned(ctx, reply);
         }
     } catch (error: any) {
         console.log("🚀 ~ bot.mention ~ error:", error?.message || error);
@@ -438,9 +463,10 @@ bot.on("text", (ctx: any, next: any) => {
     const isPrivate = ctx.chat?.type === "private"; // 私訊 bot 唔使 @
     const replyTo = ctx.message?.reply_to_message;
     const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const repliedToPhoto = !!replyTo && !!replyTo.photo && replyTo.photo.length > 0; // reply 一張相（例如編輯請求）
     const alreadyMentions = text.includes(`@${process.env.BOT_NAME}`);
 
-    if (!isCommand && (isPrivate || (repliedToBot && !alreadyMentions))) {
+    if (!isCommand && (isPrivate || (repliedToBot && !alreadyMentions) || repliedToPhoto)) {
         handleAIRequest(ctx);
     } else {
         next?.();
