@@ -52,7 +52,9 @@ function appendToHistory(chatId: string | number, name: string, text: string): v
     const filePath = getHistoryPath(chatId);
     // Flatten multi-line messages into a single line
     const flatText = text.replace(/\r?\n|\r/g, " ");
-    const line = `[${name}]: ${flatText}\n`;
+    // 加 timestamp（HK），俾 AI 知道訊息幾時發生
+    const ts = hkdayjs().format("MM-DD HH:mm");
+    const line = `[${ts}] [${name}]: ${flatText}\n`;
     try {
         fs.appendFileSync(filePath, line, "utf-8");
         // 超過上限就刪舊 history
@@ -218,6 +220,20 @@ bot.on("photo", async (ctx: any) => {
     }
 });
 
+// 派貼圖（去重 + 最多 5 張避免洗板），resolve 返真實 file_id；單張失敗 skip
+async function sendStickers(ctx: any, stickerIds: string[]): Promise<void> {
+    const toSend = [...new Set(stickerIds)].slice(0, 5);
+    for (const stickerId of toSend) {
+        try {
+            const realFileId = resolveStickerId(stickerId) || stickerId;
+            await ctx.replyWithSticker(realFileId);
+        } catch (stickerErr: any) {
+            console.log("🚀 ~ sticker reply error:", stickerErr);
+            await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
+        }
+    }
+}
+
 // 共用 AI 對話流程（mention / reply-to-bot / photo 都用）
 async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: { mimeType: string; data: string } | null }) {
     try {
@@ -275,7 +291,8 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 
         // Build recent messages context from file-based history
         const recentHistory = getRecentHistory(chatId);
-        const baseMsg = `${replyText}${currentStickerText}[Chat: ${chatName}] [${userName}]: ${prompt}`;
+        const nowStr = hkdayjs().format("YYYY-MM-DD HH:mm");
+        const baseMsg = `${replyText}${currentStickerText}[現在時間: ${nowStr}（Asia/Hong_Kong）] [Chat: ${chatName}] [${userName}]: ${prompt}`;
         let userMessage = "";
         if (recentHistory) {
             userMessage = `[Recent messages in this group]:\n${recentHistory}\n\n${baseMsg}`;
@@ -368,43 +385,35 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         // 檢查 AI 回覆是否包含 [sticker]: <stickerId>（支援多張）—— bot 自動派貼圖
         const stickerRegex = /\[sticker\]:\s*([A-Za-z0-9_\-]+)/gi;
         const stickerIds = [...reply.matchAll(stickerRegex)].map((m) => m[1].trim());
+        // 剝走 sticker marker，等 caption / 文字唔會出現 "[sticker]: xxx"
+        const replyNoStickers = reply.replace(stickerRegex, "");
 
         if (genImageMatch) {
             const imagePrompt = genImageMatch[1].trim();
-            const cleanReply = reply.replace(genImageRegex, "").trim();
+            const cleanReply = replyNoStickers.replace(genImageRegex, "").trim();
 
             try {
                 await ctx.reply("畫緊...");
                 const { text, imageData } = await getGeminiImage({ prompt: imagePrompt });
+                const caption = cleanReply || text ? truncateCaption(`${cleanReply || text}`) : undefined;
                 if (imageData) {
                     const buffer = Buffer.from(imageData.data, "base64");
-                    await ctx.replyWithPhoto(
-                        { source: buffer },
-                        { caption: cleanReply || text ? truncateCaption(`${cleanReply || text}`) : undefined }
-                    );
+                    await ctx.replyWithPhoto({ source: buffer }, { caption });
                 } else {
                     await ctx.reply(text ? `${text}` : "畫唔到");
                 }
+                // gen image 之餘都派埋 sticker（如果 AI 同時出咗）
+                if (stickerIds.length > 0) await sendStickers(ctx, stickerIds);
             } catch (genError: any) {
                 console.log("🚀 ~ gen image error:", genError);
                 await ctx.reply(`畫唔到: ${genError?.response?.data?.error?.message || genError.message}`);
             }
         } else if (stickerIds.length > 0) {
-            const cleanReply = reply.replace(stickerRegex, "").trim();
+            const cleanReply = replyNoStickers.trim();
             try {
                 // 有文字就出埋文字
                 if (cleanReply) await ctx.reply(`${cleanReply}`);
-                // 逐張派（去重 + 最多 5 張避免洗板），resolve 返真實 file_id
-                const toSend = [...new Set(stickerIds)].slice(0, 5);
-                for (const stickerId of toSend) {
-                    try {
-                        const realFileId = resolveStickerId(stickerId) || stickerId;
-                        await ctx.replyWithSticker(realFileId);
-                    } catch (stickerErr: any) {
-                        console.log("🚀 ~ sticker reply error:", stickerErr);
-                        await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
-                    }
-                }
+                await sendStickers(ctx, stickerIds);
             } catch (stickerErr: any) {
                 console.log("🚀 ~ sticker reply error:", stickerErr);
                 await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
