@@ -184,14 +184,20 @@ bot.command("j", async (ctx) => {
     );
 });
 
-// Handle photos with caption mentioning the bot
+// Handle photos: caption 有 @bot，或者 reply bot 嘅相 -> AI 回應
 bot.on("photo", async (ctx: any) => {
     const caption = ctx.message?.caption || "";
     const botName = process.env.BOT_NAME || "";
-    if (!caption.includes(`@${botName}`)) return;
+    const replyTo = ctx.message?.reply_to_message;
+    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const mentioned = caption.includes(`@${botName}`);
+    // 冇 @bot 又唔係 reply bot -> 普通相，唔理
+    if (!mentioned && !repliedToBot) return;
 
     try {
         const cleanCaption = caption.replace(`@${botName}`, "").trim();
+        const prompt =
+            cleanCaption || (repliedToBot ? "（用圖片回覆咗你）" : "幫我睇下呢張圖片");
 
         // Get the largest photo (last in array)
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
@@ -205,7 +211,7 @@ bot.on("photo", async (ctx: any) => {
         };
 
         // 重用共用 AI flow（連 reply_to / 歷史 / tool calling 都有）
-        await handleAIRequest(ctx, { prompt: cleanCaption || "幫我睇下呢張圖片", imageData });
+        await handleAIRequest(ctx, { prompt, imageData });
     } catch (error: any) {
         console.log("🚀 ~ photo handler error:", error);
         await ctx.reply(`睇圖出錯: ${error.message}`);
