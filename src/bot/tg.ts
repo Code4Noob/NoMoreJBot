@@ -463,10 +463,11 @@ bot.on("text", (ctx: any, next: any) => {
     const isPrivate = ctx.chat?.type === "private"; // 私訊 bot 唔使 @
     const replyTo = ctx.message?.reply_to_message;
     const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
-    const repliedToPhoto = !!replyTo && !!replyTo.photo && replyTo.photo.length > 0; // reply 一張相（例如編輯請求）
     const alreadyMentions = text.includes(`@${process.env.BOT_NAME}`);
 
-    if (!isCommand && (isPrivate || (repliedToBot && !alreadyMentions) || repliedToPhoto)) {
+    // 淨係：私訊 / reply bot（冇 @）先回應。user reply 一張相（冇 @bot）唔會觸發——
+    // 想喺 group 用相編輯，就要 @bot（bot.mention 會處理，replyImageData 照樣讀到）
+    if (!isCommand && (isPrivate || (repliedToBot && !alreadyMentions))) {
         handleAIRequest(ctx);
     } else {
         next?.();
