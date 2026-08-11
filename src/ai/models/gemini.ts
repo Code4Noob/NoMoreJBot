@@ -73,6 +73,25 @@ async function withAutoVPNRetry<T>(fn: () => Promise<T>): Promise<T> {
     }
 }
 
+/** 暫時性錯誤（503 / 429）可以 retry 幾次——「Deadline expired」好多時 retry 就成功 */
+async function withTransientRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+    let lastErr: any;
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await fn();
+        } catch (err: any) {
+            lastErr = err;
+            const status = err?.response?.status;
+            if (status !== 503 && status !== 429) throw err;
+            if (i < retries) {
+                console.log(`⚠️ Gemini 暫時性錯誤 (HTTP ${status})，重試 ${i + 1}/${retries}...`);
+                await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+            }
+        }
+    }
+    throw lastErr;
+}
+
 interface ToolCall {
     id: string;
     function: {
@@ -207,9 +226,11 @@ export async function getGeminiResponse({
 
     try {
         const data = await withAutoVPNRetry(async () => {
-            const res = await vpnAxios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-                requestBody
+            const res = await withTransientRetry(() =>
+                vpnAxios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                    requestBody
+                )
             );
             return res.data;
         });
@@ -307,9 +328,11 @@ export async function getGeminiImage({
 
     try {
         const data = await withAutoVPNRetry(async () => {
-            const res = await vpnAxios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-                requestBody
+            const res = await withTransientRetry(() =>
+                vpnAxios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                    requestBody
+                )
             );
             return res.data;
         });

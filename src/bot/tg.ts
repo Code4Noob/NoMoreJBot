@@ -403,8 +403,9 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         const inputPhoto = opts?.imageData ?? replyImageData;
 
         // 檢查 AI 回覆是否包含 [sticker]: <stickerId>（支援多張）—— bot 自動派貼圖
-        const stickerRegex = /\[sticker\]:\s*([A-Za-z0-9_\-]+)/gi;
-        const stickerIds = [...reply.matchAll(stickerRegex)].map((m) => m[1].trim());
+        // 相容兩種格式：[sticker]: <id>（冒號喺外）同 [sticker: <id>]（冒號喺內，AI 有時寫錯）
+        const stickerRegex = /\[sticker\]\s*:\s*([A-Za-z0-9_\-]+)|\[sticker:\s*([A-Za-z0-9_\-]+)\]/gi;
+        const stickerIds = [...reply.matchAll(stickerRegex)].map((m) => (m[1] || m[2]).trim());
         // 剝走 sticker marker，等 caption / 文字唔會出現 "[sticker]: xxx"
         const replyNoStickers = reply.replace(stickerRegex, "");
 
