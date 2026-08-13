@@ -11,10 +11,15 @@ const validateJCount = (date: Date, now: Date = new Date()) => {
 };
 
 const from = (date1: string, date2?: string): string => {
-    if (!date2) {
-        return fromNow(date1);
+    const d1 = (date1 || "").trim();
+    // 冇俾 date -> 當而家（避免 parse 空字串出垃圾日期，例如 "a month ago"）
+    if (!d1) {
+        return date2 ? hkdayjs().from(date2) : hkdayjs().fromNow();
     }
-    return hkdayjs(date1).from(date2);
+    if (!date2) {
+        return fromNow(d1);
+    }
+    return hkdayjs(d1).from(date2);
 };
 
 const fromNow = (date: string): string => {
