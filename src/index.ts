@@ -3,6 +3,7 @@ import "dotenv/config";
 import bot from './bot/tg';
 import { dbConnect } from "./db";
 import { reloadMarkSixReminders } from "./scheduler/marksix";
+import { registerBotCommands } from "./bot/commands";
 
 async function main() {
     try {
@@ -13,6 +14,8 @@ async function main() {
         console.log("❌ startup error:", error);
     }
     bot.launch();
+    // 自動註冊 bot commands（setMyCommands，唔使 BotFather）
+    registerBotCommands(bot);
 }
 
 main();
