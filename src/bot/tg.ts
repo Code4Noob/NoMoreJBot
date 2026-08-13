@@ -1,13 +1,17 @@
 import { Context, Input, Markup, Telegraf } from "telegraf";
 import { User } from "../models/user";
 import { Chat } from "../models/chat";
-import { dbConnect, dbDisconnect, dbHealthCheck } from "../db";
+import { dbHealthCheck } from "../db";
 import { from, validateJCount } from "../tools/date";
 
 import { v4 as uuidv4 } from "uuid";
-import cron from "node-cron";
 import hkdayjs from "../utils/dayjs";
 import { markSixReminder } from "../tools/marksix";
+import {
+    upsertMarkSixReminder,
+    disableMarkSixReminder,
+    isValidCron,
+} from "../scheduler/marksix";
 import { weather } from "../tools/weather";
 import { describeSticker, backfillStickerCache, resolveStickerId } from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
@@ -86,12 +90,6 @@ function getContextChat(chatId: string | number): any[] {
         contextChatMap.set(String(chatId), []);
     }
     return contextChatMap.get(String(chatId))!;
-}
-
-try {
-    dbConnect();
-} catch (error) {
-    console.log(error);
 }
 
 const initUser = async (ctx) => {
@@ -638,20 +636,36 @@ bot.command("draw", async (ctx) => {
     }
 });
 
-const chatId = "-1001862384479";
+// 馬會提醒排程而家由 DB config 驅動（見 scheduler/marksix.ts），
+// 啟動時喺 index.ts 用 reloadMarkSixReminders() 由 DB 載入。
+// 用 /marksix_remind 指令喺 Telegram 度管理 config，唔使再改 code。
+bot.command("marksix_remind", async (ctx) => {
+    const args = ctx.payload.trim().split(/\s+/).filter(Boolean);
+    const sub = args[0]?.toLowerCase();
 
-// Schedule the task to run every day at 10 AM
-cron.schedule(
-    "0 0 * * *",
-    async () => {
-        const message = await markSixReminder();
-        bot.telegram.sendMessage(chatId, message);
-    },
-    {
-        scheduled: true,
-        timezone: "Asia/Hong_Kong", // Replace with your timezone
+    // /marksix_remind off [chatId] —— 停用某 chat 嘅提醒
+    if (sub === "off") {
+        const chatId = args[1] || String(ctx.chat.id);
+        const ok = await disableMarkSixReminder(chatId);
+        await ctx.reply(ok ? `✅ 已停用 chat ${chatId} 嘅馬會提醒` : `❌ 搵唔到 chat ${chatId} 嘅記錄`);
+        return;
     }
-);
+
+    // /marksix_remind [chatId] [cron] [timezone] —— 設定 / 更新提醒
+    // （唔俾 chatId 就用指令所在嘅 chat）
+    const chatId = args[0] || String(ctx.chat.id);
+    const cronExpr = args[1] || "0 0 * * *";
+    const timezone = args[2] || "Asia/Hong_Kong";
+
+    if (!isValidCron(cronExpr)) {
+        await ctx.reply(`❌ cron 格式唔啱: ${cronExpr}`);
+        return;
+    }
+    const reminder = await upsertMarkSixReminder(bot, chatId, { cron: cronExpr, timezone });
+    await ctx.reply(
+        `✅ 馬會提醒已設定\nChat: ${reminder.chatId}\nCron: ${reminder.cron} (${reminder.timezone})\nEnabled: ${reminder.enabled}`
+    );
+});
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
