@@ -10,7 +10,6 @@ import { markSixReminder } from "../tools/marksix";
 import {
     upsertMarkSixReminder,
     disableMarkSixReminder,
-    isValidCron,
 } from "../scheduler/marksix";
 import { weather } from "../tools/weather";
 import { describeSticker, backfillStickerCache, resolveStickerId } from "../tools/sticker";
@@ -638,33 +637,31 @@ bot.command("draw", async (ctx) => {
 
 // 馬會提醒排程而家由 DB config 驅動（見 scheduler/marksix.ts），
 // 啟動時喺 index.ts 用 reloadMarkSixReminders() 由 DB 載入。
-// 用 /marksix_remind 指令喺 Telegram 度管理 config，唔使再改 code。
+// /marksix_remind 會彈個 menu 俾你揀開啟 / 停用（作用喺目前 group）。
 bot.command("marksix_remind", async (ctx) => {
-    const args = ctx.payload.trim().split(/\s+/).filter(Boolean);
-    const sub = args[0]?.toLowerCase();
-
-    // /marksix_remind off [chatId] —— 停用某 chat 嘅提醒
-    if (sub === "off") {
-        const chatId = args[1] || String(ctx.chat.id);
-        const ok = await disableMarkSixReminder(chatId);
-        await ctx.reply(ok ? `✅ 已停用 chat ${chatId} 嘅馬會提醒` : `❌ 搵唔到 chat ${chatId} 嘅記錄`);
-        return;
-    }
-
-    // /marksix_remind [chatId] [cron] [timezone] —— 設定 / 更新提醒
-    // （唔俾 chatId 就用指令所在嘅 chat）
-    const chatId = args[0] || String(ctx.chat.id);
-    const cronExpr = args[1] || "0 0 * * *";
-    const timezone = args[2] || "Asia/Hong_Kong";
-
-    if (!isValidCron(cronExpr)) {
-        await ctx.reply(`❌ cron 格式唔啱: ${cronExpr}`);
-        return;
-    }
-    const reminder = await upsertMarkSixReminder(bot, chatId, { cron: cronExpr, timezone });
     await ctx.reply(
-        `✅ 馬會提醒已設定\nChat: ${reminder.chatId}\nCron: ${reminder.cron} (${reminder.timezone})\nEnabled: ${reminder.enabled}`
+        "🎰 馬會提醒 — 想點做？",
+        Markup.inlineKeyboard([
+            Markup.button.callback("🟢 開啟提醒", "marksix_remind_on"),
+            Markup.button.callback("🔴 停用提醒", "marksix_remind_off"),
+        ])
     );
+});
+
+bot.action("marksix_remind_on", async (ctx: any) => {
+    const chatId = String(ctx.callbackQuery.message.chat.id);
+    const reminder = await upsertMarkSixReminder(bot, chatId);
+    await ctx.answerCbQuery("✅ 已開啟");
+    await ctx.editMessageText(
+        `✅ 馬會提醒已開啟\nChat: ${reminder.chatId}\nCron: ${reminder.cron} (${reminder.timezone})\nEnabled: ${reminder.enabled}`
+    );
+});
+
+bot.action("marksix_remind_off", async (ctx: any) => {
+    const chatId = String(ctx.callbackQuery.message.chat.id);
+    const ok = await disableMarkSixReminder(chatId);
+    await ctx.answerCbQuery(ok ? "✅ 已停用" : "⚠️ 未有設定");
+    await ctx.editMessageText(ok ? `✅ 已停用 chat ${chatId} 嘅馬會提醒` : `❌ 呢個 group 冇設定過馬會提醒`);
 });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
