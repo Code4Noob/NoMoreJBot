@@ -217,6 +217,44 @@ bot.on("photo", async (ctx: any) => {
     }
 });
 
+// 大相會以 file（document）形式送嚟——同樣當圖片處理（要 image mime type）
+bot.on("document", async (ctx: any) => {
+    const doc = ctx.message?.document;
+    if (!doc) return;
+    const mime = doc.mime_type || "";
+    // 淨係處理圖片（jpeg/png/webp/gif...），其他 file 唔理
+    if (!mime.startsWith("image/")) return;
+
+    const caption = ctx.message?.caption || "";
+    const botName = process.env.BOT_NAME || "";
+    const replyTo = ctx.message?.reply_to_message;
+    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const mentioned = caption.includes(`@${botName}`);
+    // 冇 @bot 又唔係 reply bot -> 普通 file，唔理
+    if (!mentioned && !repliedToBot) return;
+
+    try {
+        const cleanCaption = caption.replace(`@${botName}`, "").trim();
+        const prompt =
+            cleanCaption || (repliedToBot ? "（用圖片回覆咗你）" : "幫我睇下呢張圖片");
+
+        const fileLink = await ctx.telegram.getFileLink(doc.file_id);
+
+        // Download and convert to base64（用返 document 嘅 mime type）
+        const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+        const imageData = {
+            mimeType: mime,
+            data: Buffer.from(imgResp.data).toString("base64"),
+        };
+
+        // 重用共用 AI flow（連 reply_to / 歷史 / tool calling 都有）
+        await handleAIRequest(ctx, { prompt, imageData });
+    } catch (error: any) {
+        console.log("🚀 ~ document(image) handler error:", error);
+        await ctx.reply(`睇圖出錯: ${error.message}`);
+    }
+});
+
 // 派貼圖（去重 + 最多 5 張避免洗板），resolve 返真實 file_id；單張失敗 skip
 async function sendStickers(ctx: any, stickerIds: string[]): Promise<void> {
     const toSend = [...new Set(stickerIds)].slice(0, 5);
