@@ -177,8 +177,8 @@ bot.command("j", async (ctx) => {
     await ctx.reply(
         "Jed?",
         Markup.inlineKeyboard([
-            Markup.button.callback("Yes", "resetDay"),
-            Markup.button.callback("No", "updateDay"),
+            Markup.button.callback("Yes", `resetDay:${ctx.from.id}`),
+            Markup.button.callback("No", `updateDay:${ctx.from.id}`),
         ])
     );
 });
@@ -510,7 +510,17 @@ bot.on("sticker", (ctx: any, next: any) => {
 });
 
 // Actions
-bot.action("updateDay", async (ctx) => {
+// 舊格式 button（冇 user id）——menu 已過期，直接拒絕
+bot.action(/^(updateDay|resetDay)$/, async (ctx: any) => {
+    await ctx.answerCbQuery("❌ 呢個 menu 已過期，請重新撳 /j", { show_alert: true });
+});
+
+bot.action(/^updateDay:(\d+)$/, async (ctx: any) => {
+    // 只准 menu 主人（撳 /j 嗰個人）㩒
+    if (Number(ctx.match?.[1]) !== ctx.update.callback_query.from.id) {
+        await ctx.answerCbQuery("❌ 呢個 menu 唔係俾你㩒嘅", { show_alert: true });
+        return;
+    }
     const userId = ctx.update.callback_query.from.id;
     // const chatId = ctx.update.callback_query.message?.chat.id;
     let user = await User.findOne({
@@ -534,7 +544,12 @@ bot.action("updateDay", async (ctx) => {
     }
     await ctx.editMessageReplyMarkup(undefined);
 });
-bot.action("resetDay", async (ctx) => {
+bot.action(/^resetDay:(\d+)$/, async (ctx: any) => {
+    // 只准 menu 主人（撳 /j 嗰個人）㩒
+    if (Number(ctx.match?.[1]) !== ctx.update.callback_query.from.id) {
+        await ctx.answerCbQuery("❌ 呢個 menu 唔係俾你㩒嘅", { show_alert: true });
+        return;
+    }
     const userId = ctx.update.callback_query.from.id;
     // const chatId = ctx.update.callback_query.message?.chat.id;
     let user = await User.findOne({
