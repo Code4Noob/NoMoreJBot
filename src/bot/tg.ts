@@ -551,20 +551,45 @@ bot.action(/^resetDay:(\d+)$/, async (ctx: any) => {
         return;
     }
     const userId = ctx.update.callback_query.from.id;
-    // const chatId = ctx.update.callback_query.message?.chat.id;
+    // 撳 Yes 之後先問多一次，避免誤撳
+    await ctx.editMessageText(
+        "⚠️ 確定要 reset 你嘅 Day 嗎？",
+        Markup.inlineKeyboard([
+            Markup.button.callback("✅ 確認", `confirmResetDay:${userId}`),
+            Markup.button.callback("❌ 取消", `cancelResetDay:${userId}`),
+        ])
+    );
+    await ctx.answerCbQuery();
+});
+
+// 確認 reset
+bot.action(/^confirmResetDay:(\d+)$/, async (ctx: any) => {
+    // 只准 menu 主人㩒
+    if (Number(ctx.match?.[1]) !== ctx.update.callback_query.from.id) {
+        await ctx.answerCbQuery("❌ 唔係你㩒㗎", { show_alert: true });
+        return;
+    }
+    const userId = ctx.update.callback_query.from.id;
     let user = await User.findOne({
         id: userId,
-        // "chat.id": chatId,
     });
     if (!user) user = await initUser(ctx);
     user.day = 0;
     user.day_updated_at = hkdayjs();
     user.save();
-    await ctx.reply(
-        `${user.first_name} | Day${user.day}`,
-        Markup.removeKeyboard()
-    );
-    await ctx.editMessageReplyMarkup(undefined);
+    await ctx.answerCbQuery("✅ 已 reset");
+    await ctx.editMessageText(`${user.first_name} | Day${user.day}`);
+});
+
+// 取消 reset
+bot.action(/^cancelResetDay:(\d+)$/, async (ctx: any) => {
+    // 只准 menu 主人㩒
+    if (Number(ctx.match?.[1]) !== ctx.update.callback_query.from.id) {
+        await ctx.answerCbQuery("❌ 唔係你㩒㗎", { show_alert: true });
+        return;
+    }
+    await ctx.answerCbQuery("已取消");
+    await ctx.editMessageText("已取消 🙅");
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
 bot.command("users", async (ctx) => {
