@@ -2,10 +2,12 @@ import vpnAxios from "../../utils/vpn";
 import { ensureVPN, restartVPN, isTunnelUp } from "../../utils/vpn-manager";
 import { baseSystemPrompt } from "../skill";
 import { logAIResponse } from "../logger";
+import { toolList } from "../tools";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-export const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-lite-image";
+export const GEMINI_IMAGE_MODEL =
+    process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-lite-image";
 
 /** Gemini 地區限制錯誤：user location 唔受支援（FAILED_PRECONDITION 400） */
 function isLocationError(error: any): boolean {
@@ -52,7 +54,9 @@ async function withAutoVPNRetry<T>(fn: () => Promise<T>): Promise<T> {
             const isLocation = isLocationError(error);
             const isConn = isConnectionError(error);
             if (isLocation) {
-                console.log("🌍 Gemini location 限制（user location 唔受支援）→ 自動啟動 VPN 重試...");
+                console.log(
+                    "🌍 Gemini location 限制（user location 唔受支援）→ 自動啟動 VPN 重試..."
+                );
             } else if (isConn) {
                 console.log("⚠️ Gemini 連線失敗 → 自動重啟 VPN 重試...");
             }
@@ -74,7 +78,10 @@ async function withAutoVPNRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /** 暫時性錯誤（503 / 429）可以 retry 幾次——「Deadline expired」好多時 retry 就成功 */
-async function withTransientRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+async function withTransientRetry<T>(
+    fn: () => Promise<T>,
+    retries = 2
+): Promise<T> {
     let lastErr: any;
     for (let i = 0; i <= retries; i++) {
         try {
@@ -84,7 +91,9 @@ async function withTransientRetry<T>(fn: () => Promise<T>, retries = 2): Promise
             const status = err?.response?.status;
             if (status !== 503 && status !== 429) throw err;
             if (i < retries) {
-                console.log(`⚠️ Gemini 暫時性錯誤 (HTTP ${status})，重試 ${i + 1}/${retries}...`);
+                console.log(
+                    `⚠️ Gemini 暫時性錯誤 (HTTP ${status})，重試 ${i + 1}/${retries}...`
+                );
                 await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
             }
         }
@@ -136,7 +145,7 @@ function convertToGeminiMessages(messages: any[]): any[] {
                         functionCall: {
                             name: tc.function.name,
                             args: JSON.parse(tc.function.arguments),
-                        }
+                        },
                     };
                     // Include thoughtSignature if available (required for thinking models)
                     if (tc.thoughtSignature) {
@@ -153,42 +162,22 @@ function convertToGeminiMessages(messages: any[]): any[] {
             // Gemini 唔支援 role "function"，function response 要用 role "user" + functionResponse part
             geminiMessages.push({
                 role: "user",
-                parts: [{
-                    functionResponse: {
-                        name: msg.name,
-                        response: JSON.parse(msg.content),
-                    }
-                }]
+                parts: [
+                    {
+                        functionResponse: {
+                            name: msg.name,
+                            response: JSON.parse(msg.content),
+                        },
+                    },
+                ],
             });
         }
     }
     return geminiMessages;
 }
 
-const geminiToolList = [
-    {
-        name: "get_url_text_content",
-        description: "Get the main text content of a website specified by an URL (renders JS pages)",
-        parameters: {
-            type: "object",
-            properties: {
-                url: {
-                    type: "string",
-                    description: "URL to the https website where text content will be obtained",
-                }
-            },
-            required: ["url"],
-        }
-    },
-    {
-        name: "get_cached_stickers",
-        description: "Get the list of cached stickers (stickerId, meaning, emoji) that the bot can send. Use a returned stickerId in the reply as [sticker]: <stickerId> to send that sticker.",
-        parameters: {
-            type: "object",
-            properties: {},
-        }
-    }
-];
+// Gemini 工具表由共用 toolList（src/ai/tools.ts）轉換，避免同 OpenAI 格式兩邊唔同步
+const geminiToolList = toolList.map((t: any) => t.function);
 
 // functionHandlers 已移到 src/ai/tools.ts（provider 共用）
 
@@ -237,15 +226,28 @@ export async function getGeminiResponse({
 
         const candidate = data.candidates?.[0];
         if (!candidate) {
-            console.log("🚀 ~ getGeminiResponse ~ no candidate:", JSON.stringify(data));
-            return { message: "No response from Gemini", toolCalls: undefined, usage: 0, imageData: null };
+            console.log(
+                "🚀 ~ getGeminiResponse ~ no candidate:",
+                JSON.stringify(data)
+            );
+            return {
+                message: "No response from Gemini",
+                toolCalls: undefined,
+                usage: 0,
+                imageData: null,
+            };
         }
 
         const totalTokens = data.usageMetadata?.totalTokenCount ?? 0;
         const parts = candidate.content?.parts ?? [];
 
         if (parts.length === 0) {
-            return { message: null, toolCalls: undefined, usage: totalTokens, imageData: null };
+            return {
+                message: null,
+                toolCalls: undefined,
+                usage: totalTokens,
+                imageData: null,
+            };
         }
 
         const toolCalls: ToolCall[] = [];
@@ -262,13 +264,17 @@ export async function getGeminiResponse({
                         name: part.functionCall.name,
                         arguments: JSON.stringify(part.functionCall.args),
                     },
-                    thoughtSignature: part.thoughtSignature || candidate.thoughtSignature,
+                    thoughtSignature:
+                        part.thoughtSignature || candidate.thoughtSignature,
                 });
             }
             if (part.text) {
                 textParts.push(part.text);
             }
-            if (part.inlineData && part.inlineData.mimeType?.startsWith("image/")) {
+            if (
+                part.inlineData &&
+                part.inlineData.mimeType?.startsWith("image/")
+            ) {
                 imageData = {
                     mimeType: part.inlineData.mimeType,
                     data: part.inlineData.data,
@@ -295,7 +301,10 @@ export async function getGeminiResponse({
             imageData,
         };
     } catch (error: any) {
-        console.log("🚀 ~ getGeminiResponse ~ error:", error?.response?.data || error.message);
+        console.log(
+            "🚀 ~ getGeminiResponse ~ error:",
+            error?.response?.data || error.message
+        );
         throw error;
     }
 }
@@ -306,7 +315,10 @@ export async function getGeminiImage({
 }: {
     prompt: string;
     inputImage?: { mimeType: string; data: string } | null;
-}): Promise<{ text: string | null; imageData: { mimeType: string; data: string } | null }> {
+}): Promise<{
+    text: string | null;
+    imageData: { mimeType: string; data: string } | null;
+}> {
     const IMAGE_MODEL = GEMINI_IMAGE_MODEL;
 
     // 編輯相：將 input 相加做第一個 part，再跟住編輯指示文字
@@ -339,7 +351,10 @@ export async function getGeminiImage({
 
         const candidate = data.candidates?.[0];
         if (!candidate) {
-            console.log("🚀 ~ getGeminiImage ~ no candidate:", JSON.stringify(data));
+            console.log(
+                "🚀 ~ getGeminiImage ~ no candidate:",
+                JSON.stringify(data)
+            );
             return { text: null, imageData: null };
         }
 
@@ -351,7 +366,10 @@ export async function getGeminiImage({
             // 跳過 Gemini 思考內容（thought），唔好將 reasoning 當正文
             if (part.thought) continue;
             if (part.text) text += part.text + "\n";
-            if (part.inlineData && part.inlineData.mimeType?.startsWith("image/")) {
+            if (
+                part.inlineData &&
+                part.inlineData.mimeType?.startsWith("image/")
+            ) {
                 imageData = {
                     mimeType: part.inlineData.mimeType,
                     data: part.inlineData.data,
@@ -361,7 +379,10 @@ export async function getGeminiImage({
 
         return { text: text.trim() || null, imageData };
     } catch (error: any) {
-        console.log("🚀 ~ getGeminiImage ~ error:", error?.response?.data || error.message);
+        console.log(
+            "🚀 ~ getGeminiImage ~ error:",
+            error?.response?.data || error.message
+        );
         throw error;
     }
 }

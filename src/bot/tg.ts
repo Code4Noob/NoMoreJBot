@@ -12,7 +12,11 @@ import {
     disableMarkSixReminder,
 } from "../scheduler/marksix";
 import { weather } from "../tools/weather";
-import { describeSticker, backfillStickerCache, resolveStickerId } from "../tools/sticker";
+import {
+    describeSticker,
+    backfillStickerCache,
+    resolveStickerId,
+} from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
 import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
@@ -51,7 +55,11 @@ function trimHistoryFile(filePath: string): void {
     }
 }
 
-function appendToHistory(chatId: string | number, name: string, text: string): void {
+function appendToHistory(
+    chatId: string | number,
+    name: string,
+    text: string
+): void {
     const filePath = getHistoryPath(chatId);
     // Flatten multi-line messages into a single line
     const flatText = text.replace(/\r?\n|\r/g, " ");
@@ -67,7 +75,10 @@ function appendToHistory(chatId: string | number, name: string, text: string): v
     }
 }
 
-function getRecentHistory(chatId: string | number, maxLines: number = CONTEXT_SIZE): string {
+function getRecentHistory(
+    chatId: string | number,
+    maxLines: number = CONTEXT_SIZE
+): string {
     const filePath = getHistoryPath(chatId);
     try {
         if (!fs.existsSync(filePath)) return "";
@@ -140,10 +151,14 @@ bot.help(async (ctx) => {
         aiProvider === "deepseek"
             ? process.env.DEEPSEEK_MODEL || "deepseek-chat"
             : aiProvider === "gpt"
-            ? process.env.AZURE_OPENAI_URL?.match(/deployments\/([^/?]+)/)?.[1] || "gpt"
-            : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+              ? process.env.AZURE_OPENAI_URL?.match(
+                    /deployments\/([^/?]+)/
+                )?.[1] || "gpt"
+              : process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
-    const lines: string[] = [`🧪 Health Check（uptime ${formatUptime(process.uptime())}）`];
+    const lines: string[] = [
+        `🧪 Health Check（uptime ${formatUptime(process.uptime())}）`,
+    ];
     lines.push(`• AI: ${aiProvider} / ${aiModel}`);
     const tunIP = detectTunnelIP();
     lines.push(tunIP ? `• VPN: ✅ up（${tunIP}）` : "• VPN: ⚠️ down");
@@ -188,7 +203,8 @@ bot.on("photo", async (ctx: any) => {
     const caption = ctx.message?.caption || "";
     const botName = process.env.BOT_NAME || "";
     const replyTo = ctx.message?.reply_to_message;
-    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const repliedToBot =
+        !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
     const mentioned = caption.includes(`@${botName}`);
     // 冇 @bot 又唔係 reply bot -> 普通相，唔理
     if (!mentioned && !repliedToBot) return;
@@ -196,14 +212,17 @@ bot.on("photo", async (ctx: any) => {
     try {
         const cleanCaption = caption.replace(`@${botName}`, "").trim();
         const prompt =
-            cleanCaption || (repliedToBot ? "（用圖片回覆咗你）" : "幫我睇下呢張圖片");
+            cleanCaption ||
+            (repliedToBot ? "（用圖片回覆咗你）" : "幫我睇下呢張圖片");
 
         // Get the largest photo (last in array)
         const photo = ctx.message.photo[ctx.message.photo.length - 1];
         const fileLink = await ctx.telegram.getFileLink(photo.file_id);
 
         // Download and convert to base64 (Telegram photos are always JPEG)
-        const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+        const imgResp = await axios.get(fileLink.href, {
+            responseType: "arraybuffer",
+        });
         const imageData = {
             mimeType: "image/jpeg",
             data: Buffer.from(imgResp.data).toString("base64"),
@@ -228,7 +247,8 @@ bot.on("document", async (ctx: any) => {
     const caption = ctx.message?.caption || "";
     const botName = process.env.BOT_NAME || "";
     const replyTo = ctx.message?.reply_to_message;
-    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const repliedToBot =
+        !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
     const mentioned = caption.includes(`@${botName}`);
     // 冇 @bot 又唔係 reply bot -> 普通 file，唔理
     if (!mentioned && !repliedToBot) return;
@@ -236,12 +256,15 @@ bot.on("document", async (ctx: any) => {
     try {
         const cleanCaption = caption.replace(`@${botName}`, "").trim();
         const prompt =
-            cleanCaption || (repliedToBot ? "（用圖片回覆咗你）" : "幫我睇下呢張圖片");
+            cleanCaption ||
+            (repliedToBot ? "（用圖片回覆咗你）" : "幫我睇下呢張圖片");
 
         const fileLink = await ctx.telegram.getFileLink(doc.file_id);
 
         // Download and convert to base64（用返 document 嘅 mime type）
-        const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+        const imgResp = await axios.get(fileLink.href, {
+            responseType: "arraybuffer",
+        });
         const imageData = {
             mimeType: mime,
             data: Buffer.from(imgResp.data).toString("base64"),
@@ -285,15 +308,24 @@ async function sendSectioned(ctx: any, text: string): Promise<void> {
 }
 
 // 共用 AI 對話流程（mention / reply-to-bot / photo 都用）
-async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: { mimeType: string; data: string } | null }) {
+async function handleAIRequest(
+    ctx: any,
+    opts?: {
+        prompt?: string;
+        imageData?: { mimeType: string; data: string } | null;
+    }
+) {
     try {
         // 支援非文字訊息（例如 sticker reply）——冇 text 就用預設 prompt
         const rawText = ctx.message.text || "";
-        let prompt = (opts?.prompt ?? rawText.replace(`@${process.env.BOT_NAME}`, "")).trim();
+        let prompt = (
+            opts?.prompt ?? rawText.replace(`@${process.env.BOT_NAME}`, "")
+        ).trim();
         if (!prompt && ctx.message.sticker) {
             prompt = "（用貼圖回覆咗你）";
         }
-        const userName = ctx.message.from.first_name || ctx.message.from.username || "User";
+        const userName =
+            ctx.message.from.first_name || ctx.message.from.username || "User";
         const chatName = ctx.chat?.title || ctx.chat?.id || "Unknown";
         const chatId = ctx.chat.id;
 
@@ -302,28 +334,42 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         let replyText = "";
         let replyImageData: { mimeType: string; data: string } | null = null;
         if (replyTo) {
-            const replyName = replyTo.from?.first_name || replyTo.from?.username || "用戶";
+            const replyName =
+                replyTo.from?.first_name || replyTo.from?.username || "用戶";
             if (replyTo.text) {
                 replyText = `[引用咗 ${replyName} 嘅訊息]: ${replyTo.text}\n\n`;
             } else if (replyTo.photo && replyTo.photo.length > 0) {
                 replyText = `[引用咗 ${replyName} 嘅圖片]\n\n`;
                 try {
                     const photo = replyTo.photo[replyTo.photo.length - 1];
-                    const fileLink = await ctx.telegram.getFileLink(photo.file_id);
-                    const imgResp = await axios.get(fileLink.href, { responseType: "arraybuffer" });
+                    const fileLink = await ctx.telegram.getFileLink(
+                        photo.file_id
+                    );
+                    const imgResp = await axios.get(fileLink.href, {
+                        responseType: "arraybuffer",
+                    });
                     replyImageData = {
                         mimeType: "image/jpeg",
                         data: Buffer.from(imgResp.data).toString("base64"),
                     };
                 } catch (err: any) {
-                    console.log("⚠️ reply-to 圖片下載失敗:", err?.message || err);
+                    console.log(
+                        "⚠️ reply-to 圖片下載失敗:",
+                        err?.message || err
+                    );
                 }
             } else if (replyTo.sticker) {
                 try {
-                    const stickerMeaning = await describeSticker(replyTo.sticker, ctx.telegram);
+                    const stickerMeaning = await describeSticker(
+                        replyTo.sticker,
+                        ctx.telegram
+                    );
                     replyText = `[引用咗 ${replyName} 嘅貼圖]: ${stickerMeaning}\n\n`;
                 } catch (err: any) {
-                    console.log("⚠️ reply-to 貼圖辨識失敗:", err?.message || err);
+                    console.log(
+                        "⚠️ reply-to 貼圖辨識失敗:",
+                        err?.message || err
+                    );
                 }
             }
         }
@@ -332,10 +378,16 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         let currentStickerText = "";
         if (ctx.message?.sticker) {
             try {
-                const meaning = await describeSticker(ctx.message.sticker, ctx.telegram);
+                const meaning = await describeSticker(
+                    ctx.message.sticker,
+                    ctx.telegram
+                );
                 currentStickerText = `[你收到一張貼圖（${userName}）]: ${meaning}\n\n`;
             } catch (err: any) {
-                console.log("⚠️ current sticker 辨識失敗:", err?.message || err);
+                console.log(
+                    "⚠️ current sticker 辨識失敗:",
+                    err?.message || err
+                );
             }
         }
 
@@ -373,6 +425,7 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 
         // Handle model function calls in a loop (Gemini may make multiple calls)
         let maxToolRounds = 5;
+        let retryTimes = 2;
         while (toolCalls && maxToolRounds > 0) {
             maxToolRounds--;
             contextMessages.push({
@@ -410,10 +463,13 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
         // 🧠 處理 [user_skill]: 更新對某 user 嘅專屬人格
         const userSkillIdx = reply.indexOf("[user_skill]:");
         if (userSkillIdx !== -1 && ctx.from?.id) {
-            const content = reply.slice(userSkillIdx + "[user_skill]:".length).trim();
+            const content = reply
+                .slice(userSkillIdx + "[user_skill]:".length)
+                .trim();
             if (content) saveUserSkill(ctx.from.id, content);
             // 剝走 marker 同內容，淨係顯示原本嘅回覆
-            reply = reply.slice(0, userSkillIdx).trim() || "已更新對你嘅專屬人格";
+            reply =
+                reply.slice(0, userSkillIdx).trim() || "已更新對你嘅專屬人格";
         }
 
         fs.appendFile(
@@ -429,7 +485,8 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 
         // 🎨 檢查 AI 回覆是否包含圖片生成 / 編輯指令
         // "gen image edit <描述>" = 編輯相（用 input 相）；"gen image <描述>" = 由零生圖
-        const genImageEditRegex = /(?:\*\*\*)?\s*gen image edit\s*(?:\*\*\*)?\s+(.+)/i;
+        const genImageEditRegex =
+            /(?:\*\*\*)?\s*gen image edit\s*(?:\*\*\*)?\s+(.+)/i;
         const genImageRegex = /(?:\*\*\*)?\s*gen image\s*(?:\*\*\*)?\s+(.+)/i;
         const genImageEditMatch = reply.match(genImageEditRegex);
         const genImageMatch = genImageEditMatch || reply.match(genImageRegex);
@@ -439,8 +496,11 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
 
         // 檢查 AI 回覆是否包含 [sticker]: <stickerId>（支援多張）—— bot 自動派貼圖
         // 相容兩種格式：[sticker]: <id>（冒號喺外）同 [sticker: <id>]（冒號喺內，AI 有時寫錯）
-        const stickerRegex = /\[sticker\]\s*:\s*([A-Za-z0-9_\-]+)|\[sticker:\s*([A-Za-z0-9_\-]+)\]/gi;
-        const stickerIds = [...reply.matchAll(stickerRegex)].map((m) => (m[1] || m[2]).trim());
+        const stickerRegex =
+            /\[sticker\]\s*:\s*([A-Za-z0-9_\-]+)|\[sticker:\s*([A-Za-z0-9_\-]+)\]/gi;
+        const stickerIds = [...reply.matchAll(stickerRegex)].map((m) =>
+            (m[1] || m[2]).trim()
+        );
         // 剝走 sticker marker，等 caption / 文字唔會出現 "[sticker]: xxx"
         const replyNoStickers = reply.replace(stickerRegex, "");
 
@@ -456,18 +516,25 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
                     prompt: imagePrompt,
                     inputImage: isEdit ? inputPhoto : undefined,
                 });
-                const caption = cleanReply || text ? truncateCaption(`${cleanReply || text}`) : undefined;
+                const caption =
+                    cleanReply || text
+                        ? truncateCaption(`${cleanReply || text}`)
+                        : undefined;
                 if (imageData) {
                     const buffer = Buffer.from(imageData.data, "base64");
                     await ctx.replyWithPhoto({ source: buffer }, { caption });
                 } else {
-                    await ctx.reply(text ? `${text}` : (isEdit ? "執唔到" : "畫唔到"));
+                    await ctx.reply(
+                        text ? `${text}` : isEdit ? "執唔到" : "畫唔到"
+                    );
                 }
                 // gen image 之餘都派埋 sticker（如果 AI 同時出咗）
                 if (stickerIds.length > 0) await sendStickers(ctx, stickerIds);
             } catch (genError: any) {
                 console.log("🚀 ~ gen image error:", genError);
-                await ctx.reply(`${isEdit ? "執相" : "畫"}唔到: ${genError?.response?.data?.error?.message || genError.message}`);
+                await ctx.reply(
+                    `${isEdit ? "執相" : "畫"}唔到: ${genError?.response?.data?.error?.message || genError.message}`
+                );
             }
         } else if (stickerIds.length > 0) {
             const cleanReply = replyNoStickers.trim();
@@ -477,14 +544,20 @@ async function handleAIRequest(ctx: any, opts?: { prompt?: string; imageData?: {
                 await sendStickers(ctx, stickerIds);
             } catch (stickerErr: any) {
                 console.log("🚀 ~ sticker reply error:", stickerErr);
-                await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
+                await ctx.reply(
+                    `貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`
+                );
             }
         } else {
             await sendSectioned(ctx, reply);
         }
     } catch (error: any) {
         console.log("🚀 ~ bot.mention ~ error:", error?.message || error);
-        const errMsg = error?.response?.data?.error?.message || error?.response?.data || error?.message || "未知錯誤";
+        const errMsg =
+            error?.response?.data?.error?.message ||
+            error?.response?.data ||
+            error?.message ||
+            "未知錯誤";
         await ctx.reply(`${errMsg}`).catch(() => {});
     }
 }
@@ -498,7 +571,8 @@ bot.on("text", (ctx: any, next: any) => {
     const isCommand = text.startsWith("/"); // commands 留返俾 bot.command() 處理
     const isPrivate = ctx.chat?.type === "private"; // 私訊 bot 唔使 @
     const replyTo = ctx.message?.reply_to_message;
-    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const repliedToBot =
+        !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
     const alreadyMentions = text.includes(`@${process.env.BOT_NAME}`);
 
     // 淨係：私訊 / reply bot（冇 @）先回應。user reply 一張相（冇 @bot）唔會觸發——
@@ -515,7 +589,11 @@ bot.on("message", async (ctx: any, next: any) => {
     const chatId = ctx.chat?.id;
     if (!chatId) return next?.();
     const isBot = ctx.message.from?.id === ctx.botInfo?.id;
-    const name = isBot ? "Bot" : (ctx.message.from?.first_name || ctx.message.from?.username || "Unknown");
+    const name = isBot
+        ? "Bot"
+        : ctx.message.from?.first_name ||
+          ctx.message.from?.username ||
+          "Unknown";
 
     // 貼圖：辨識內容（有 cache）後寫入 history，等 AI 之後睇得明貼圖講咩
     const sticker = ctx.message?.sticker;
@@ -539,7 +617,8 @@ bot.on("message", async (ctx: any, next: any) => {
 // user reply bot with sticker -> 都要 AI 回應（認得到張貼圖）
 bot.on("sticker", (ctx: any, next: any) => {
     const replyTo = ctx.message?.reply_to_message;
-    const repliedToBot = !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
+    const repliedToBot =
+        !!replyTo && !!ctx.botInfo && replyTo.from?.id === ctx.botInfo.id;
     if (repliedToBot) {
         handleAIRequest(ctx);
     } else {
@@ -550,13 +629,17 @@ bot.on("sticker", (ctx: any, next: any) => {
 // Actions
 // 舊格式 button（冇 user id）——menu 已過期，直接拒絕
 bot.action(/^(updateDay|resetDay)$/, async (ctx: any) => {
-    await ctx.answerCbQuery("❌ 呢個 menu 已過期，請重新撳 /j", { show_alert: true });
+    await ctx.answerCbQuery("❌ 呢個 menu 已過期，請重新撳 /j", {
+        show_alert: true,
+    });
 });
 
 bot.action(/^updateDay:(\d+)$/, async (ctx: any) => {
     // 只准 menu 主人（撳 /j 嗰個人）㩒
     if (Number(ctx.match?.[1]) !== ctx.update.callback_query.from.id) {
-        await ctx.answerCbQuery("❌ 呢個 menu 唔係俾你㩒嘅", { show_alert: true });
+        await ctx.answerCbQuery("❌ 呢個 menu 唔係俾你㩒嘅", {
+            show_alert: true,
+        });
         return;
     }
     const userId = ctx.update.callback_query.from.id;
@@ -585,7 +668,9 @@ bot.action(/^updateDay:(\d+)$/, async (ctx: any) => {
 bot.action(/^resetDay:(\d+)$/, async (ctx: any) => {
     // 只准 menu 主人（撳 /j 嗰個人）㩒
     if (Number(ctx.match?.[1]) !== ctx.update.callback_query.from.id) {
-        await ctx.answerCbQuery("❌ 呢個 menu 唔係俾你㩒嘅", { show_alert: true });
+        await ctx.answerCbQuery("❌ 呢個 menu 唔係俾你㩒嘅", {
+            show_alert: true,
+        });
         return;
     }
     const userId = ctx.update.callback_query.from.id;
@@ -673,6 +758,18 @@ bot.command("marksix", async (ctx) => {
     await ctx.reply(message);
 });
 
+bot.command("transportation", async (ctx) => {
+    const payload = ctx.payload.trim();
+    if (!payload) {
+        await ctx.reply(
+            "想去邊？格式：/transportation <出發地>去<目的地>\n例如：/transportation 旺角去中環"
+        );
+        return;
+    }
+    // 行返共用 AI flow，等 LLM 用交通工具（plan_journey / mtr_find_route…）搵路
+    await handleAIRequest(ctx, { prompt: `用戶想查交通路線：${payload}` });
+});
+
 bot.command("jp", async (ctx) => {
     const level = ctx.payload.trim() || 1;
     try {
@@ -685,7 +782,9 @@ bot.command("jp", async (ctx) => {
         await ctx.reply(message);
     } catch (error: any) {
         console.log("🚀 ~ jp error:", error?.response?.data || error.message);
-        await ctx.reply(`JP 查唔到: ${error?.response?.data?.error || error.message}`);
+        await ctx.reply(
+            `JP 查唔到: ${error?.response?.data?.error || error.message}`
+        );
     }
 });
 
@@ -709,7 +808,9 @@ bot.command("draw", async (ctx) => {
         }
     } catch (error: any) {
         console.log("🚀 ~ bot.command draw ~ error:", error);
-        await ctx.reply(`畫唔到: ${error?.response?.data?.error?.message || error.message}`);
+        await ctx.reply(
+            `畫唔到: ${error?.response?.data?.error?.message || error.message}`
+        );
     }
 });
 
@@ -739,7 +840,11 @@ bot.action("marksix_remind_off", async (ctx: any) => {
     const chatId = String(ctx.callbackQuery.message.chat.id);
     const ok = await disableMarkSixReminder(chatId);
     await ctx.answerCbQuery(ok ? "✅ 已停用" : "⚠️ 未有設定");
-    await ctx.editMessageText(ok ? `✅ 已停用 chat ${chatId} 嘅馬會提醒` : `❌ 呢個 group 冇設定過馬會提醒`);
+    await ctx.editMessageText(
+        ok
+            ? `✅ 已停用 chat ${chatId} 嘅馬會提醒`
+            : `❌ 呢個 group 冇設定過馬會提醒`
+    );
 });
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
