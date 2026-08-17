@@ -1,12 +1,14 @@
 /**
- * 香港交通工具層（KMB/LWB 巴士 + MTR）。
+ * 香港交通工具層（KMB/LWB 巴士 + 城巴 CTB + MTR）。
  *
  * 數據來源（全部官方公開、免 key）：
  *   KMB/LWB 路線/車站/ETA：https://data.etabus.gov.hk/v1/transport/kmb/
+ *   城巴(CTB) 路線/車站序/ETA：https://rt.data.gov.hk/v1/transport/citybus-nwfb/
+ *     （城巴官方 API 冇 stop 名/座標 → 用每日更新嘅 mirror 補充）
  *   Geocoding（地名 → 經緯度）：Nominatim (OpenStreetMap)
  *   MTR：冇官方公開 API → 用內置嘅路線/車站靜態數據 + BFS 搵路
  *
- * 註：KMB API 係香港政府 data.gov.hk 服務，直連即可，唔使行 VPN。
+ * 註：KMB / 城巴 API 係香港政府 data.gov.hk 服務，直連即可，唔使行 VPN。
  */
 import axios from "axios";
 import hkdayjs from "../utils/dayjs";
@@ -156,6 +158,244 @@ export async function getKmbStopEta(stopId: string): Promise<KmbEta[]> {
             remark: e.rmk_tc || e.rmk_en || "",
         };
     });
+}
+
+// ---------- Citybus（城巴） ----------
+const CTB_BASE = "https://rt.data.gov.hk/v1/transport/citybus-nwfb";
+// 城巴官方 API 冇提供 stop 名 / 座標，用呢個每日 5am HKT 更新嘅 mirror 補充
+const CTB_STOPS_MIRROR =
+    "https://winstonma.github.io/MMM-HK-Transport-ETA-Data/ctb/stops/allstops.json";
+const CTB_ROUTES_MIRROR =
+    "https://winstonma.github.io/MMM-HK-Transport-ETA-Data/ctb/routes/allroutes.json";
+
+export interface CtbRoute {
+    route: string;
+    orig_tc: string;
+    orig_en: string;
+    dest_tc: string;
+    dest_en: string;
+}
+
+let ctbRouteListCache: { ts: number; data: CtbRoute[] } | null = null;
+let ctbStopsInfoCache: {
+    ts: number;
+    data: Map<
+        string,
+        {
+            name_tc: string;
+            name_en: string;
+            lat: string;
+            long: string;
+            routes: string[];
+        }
+    >;
+} | null = null;
+const ctbRouteStopCache = new Map<
+    string,
+    { ts: number; data: { seq: number; stop: string; name: string }[] }
+>();
+
+async function fetchCtbRoutes(): Promise<CtbRoute[]> {
+    if (ctbRouteListCache && Date.now() - ctbRouteListCache.ts < CACHE_TTL)
+        return ctbRouteListCache.data;
+    const { data } = await axios.get(`${CTB_BASE}/route/ctb`);
+    ctbRouteListCache = {
+        ts: Date.now(),
+        data: (data?.data || []).map((r: any) => ({
+            route: r.route,
+            orig_tc: r.orig_tc || "",
+            orig_en: r.orig_en || "",
+            dest_tc: r.dest_tc || "",
+            dest_en: r.dest_en || "",
+        })),
+    };
+    return ctbRouteListCache.data;
+}
+
+async function fetchCtbStopsInfo() {
+    if (ctbStopsInfoCache && Date.now() - ctbStopsInfoCache.ts < CACHE_TTL)
+        return ctbStopsInfoCache.data;
+    const { data } = await axios.get(CTB_STOPS_MIRROR, { timeout: 30000 });
+    const map = new Map<
+        string,
+        {
+            name_tc: string;
+            name_en: string;
+            lat: string;
+            long: string;
+            routes: string[];
+        }
+    >();
+    for (const stopId of Object.keys(data || {})) {
+        const s = data[stopId];
+        if (s) {
+            map.set(stopId, {
+                name_tc: s.name_tc || "",
+                name_en: s.name_en || "",
+                lat: s.lat || "",
+                long: s.long || "",
+                routes: Array.isArray(s.routes) ? s.routes : [],
+            });
+        }
+    }
+    ctbStopsInfoCache = { ts: Date.now(), data: map };
+    return map;
+}
+
+interface CtbRouteDirections {
+    O?: { stops: string[]; orig_tc?: string; dest_tc?: string };
+    I?: { stops: string[]; orig_tc?: string; dest_tc?: string };
+}
+let ctbRoutesMapCache: {
+    ts: number;
+    data: Record<string, CtbRouteDirections>;
+} | null = null;
+
+// 城巴 allroutes.json：route → { O/I: { stops: [順序 stop id], orig_tc, dest_tc } }
+async function fetchCtbRoutesMap(): Promise<
+    Record<string, CtbRouteDirections>
+> {
+    if (ctbRoutesMapCache && Date.now() - ctbRoutesMapCache.ts < CACHE_TTL)
+        return ctbRoutesMapCache.data;
+    const { data } = await axios.get(CTB_ROUTES_MIRROR, { timeout: 30000 });
+    ctbRoutesMapCache = { ts: Date.now(), data: data?.routes || {} };
+    return ctbRoutesMapCache.data;
+}
+
+// bound: outbound / inbound（城巴 API 用呢兩個字）
+function toCtbDir(bound: string): string {
+    const b = String(bound || "").toLowerCase();
+    if (b === "i" || b === "inbound") return "inbound";
+    return "outbound";
+}
+
+/** 用關鍵字搜城巴路線（路線號 / 起點 / 終點） */
+export async function searchCitybusRoutes(keyword: string): Promise<any[]> {
+    const routes = await fetchCtbRoutes();
+    const kw = (keyword || "").trim();
+    const lower = kw.toLowerCase();
+    if (!kw) return [];
+    const matches = routes.filter(
+        (r) =>
+            r.route.toLowerCase().includes(lower) ||
+            r.orig_tc.includes(kw) ||
+            r.dest_tc.includes(kw) ||
+            r.orig_en.toLowerCase().includes(lower) ||
+            r.dest_en.toLowerCase().includes(lower)
+    );
+    return matches.slice(0, 20).map((r) => ({
+        route: r.route,
+        from: r.orig_tc,
+        to: r.dest_tc,
+    }));
+}
+
+async function getCtbRouteStopsInternal(
+    route: string,
+    bound: string
+): Promise<{ seq: number; stop: string; name: string }[]> {
+    const key = `${route}|${bound}`;
+    const cached = ctbRouteStopCache.get(key);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
+    const dir = toCtbDir(bound);
+    const [{ data }, infoMap] = await Promise.all([
+        axios.get(
+            `${CTB_BASE}/route-stop/ctb/${encodeURIComponent(route)}/${dir}`
+        ),
+        fetchCtbStopsInfo(),
+    ]);
+    const list = (data?.data || [])
+        .map((s: any) => ({
+            seq: Number(s.seq),
+            stop: s.stop,
+            name: infoMap.get(s.stop)?.name_tc || "",
+        }))
+        .sort((a: any, b: any) => a.seq - b.seq);
+    ctbRouteStopCache.set(key, { ts: Date.now(), data: list });
+    return list;
+}
+
+/** 某城巴路線嘅順序車站表 */
+export async function getCitybusRouteStops(
+    route: string,
+    bound: string
+): Promise<any[]> {
+    const list = await getCtbRouteStopsInternal(route, bound);
+    return list.map((s) => ({ seq: s.seq, stop: s.stop, name: s.name }));
+}
+
+/** 城巴某車站 + 某路線嘅到站時間（ETA） */
+export async function getCitybusStopEta(
+    stopId: string,
+    route: string
+): Promise<any[]> {
+    const { data } = await axios.get(
+        `${CTB_BASE}/eta/ctb/${encodeURIComponent(stopId)}/${encodeURIComponent(route)}`
+    );
+    const list: any[] = data?.data || [];
+    const now = hkdayjs();
+    return list.slice(0, 6).map((e) => {
+        const eta = hkdayjs(e.eta);
+        const mins = Math.max(0, eta.diff(now, "minute"));
+        return {
+            route: e.route,
+            dir: e.dir === "I" ? "inbound" : "outbound",
+            seq: e.seq ?? 0,
+            dest: e.dest_tc || e.dest_en || "",
+            eta: eta.format("HH:mm"),
+            mins,
+            remark: e.rmk_tc || e.rmk_en || "",
+        };
+    });
+}
+
+async function nearestCtbStops(
+    lat: number,
+    lon: number,
+    limit: number,
+    radiusKm = 1.5
+) {
+    const infoMap = await fetchCtbStopsInfo();
+    return [...infoMap.entries()]
+        .map(([stop, info]) => ({
+            stop,
+            name: info.name_tc,
+            routes: info.routes,
+            dist_m: Math.round(
+                haversineKm(
+                    lat,
+                    lon,
+                    parseFloat(info.lat),
+                    parseFloat(info.long)
+                ) * 1000
+            ),
+        }))
+        .filter((s) => !Number.isNaN(s.dist_m) && s.dist_m <= radiusKm * 1000)
+        .sort((a, b) => a.dist_m - b.dist_m)
+        .slice(0, limit);
+}
+
+/** 用地名/關鍵字搵最近嘅城巴車站 */
+export async function findNearbyCitybusStops(
+    query: string,
+    radiusKm = 1.5
+): Promise<any> {
+    const point = await geocode(query);
+    if (!point)
+        return {
+            error: `搵唔到「${query}」嘅位置，請俾更準確嘅地方名`,
+            results: [],
+        };
+    const results = await nearestCtbStops(point.lat, point.lon, 8, radiusKm);
+    return {
+        query,
+        results: results.map((s: any) => ({
+            stop: s.stop,
+            name: s.name,
+            dist_m: s.dist_m,
+        })),
+    };
 }
 
 // ---------- Geocoding（Nominatim） ----------
@@ -574,16 +814,100 @@ async function routesAtStop(stopId: string): Promise<KmbEta[]> {
     }
 }
 
+// 城巴直達配對：由 mirror 嘅 stop→routes + route→stops 搵 direct 車（唔使逐條 call API）
+async function planCitybusDirect(
+    originPoint: { lat: number; lon: number },
+    destPoint: { lat: number; lon: number }
+): Promise<any> {
+    const [origStops, destStops, routesMap] = await Promise.all([
+        nearestCtbStops(originPoint.lat, originPoint.lon, 5),
+        nearestCtbStops(destPoint.lat, destPoint.lon, 5),
+        fetchCtbRoutesMap(),
+    ]);
+    const destStopIds = new Set(destStops.map((s) => s.stop));
+    const destNameById = new Map(destStops.map((s) => [s.stop, s.name]));
+
+    // 先喺 memory 配對（唔使 call API）
+    const matches: any[] = [];
+    const seen = new Set<string>();
+    for (const os of origStops) {
+        const routes = (os.routes || []).slice(0, 8);
+        for (const route of routes) {
+            const dirs = routesMap[route] || {};
+            for (const dir of ["O", "I"] as const) {
+                const dirStops = dirs[dir]?.stops || [];
+                const boardIdx = dirStops.indexOf(os.stop);
+                if (boardIdx < 0) continue;
+                const alightStopId = dirStops.find(
+                    (s, idx) => idx > boardIdx && destStopIds.has(s)
+                );
+                if (!alightStopId) continue;
+                const key = `${route}|${dir}|${os.stop}|${alightStopId}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                matches.push({ route, dir, board: os, alightStopId });
+            }
+        }
+    }
+
+    // 只係為頭 12 個 candidate 攞 ETA（控制 API call 數量）
+    const limited = matches.slice(0, 12);
+    const etas = await Promise.all(
+        limited.map((m) =>
+            getCitybusStopEta(m.board.stop, m.route).catch(() => [])
+        )
+    );
+
+    const directOptions = limited.slice(0, 8).map((m, i) => {
+        const bound = m.dir === "O" ? "outbound" : "inbound";
+        const firstEta =
+            etas[i].find((e: any) => e.dir === bound) || etas[i][0];
+        return {
+            route: m.route,
+            bound,
+            board: m.board.name,
+            boardStopId: m.board.stop,
+            alight: destNameById.get(m.alightStopId) || "",
+            alightStopId: m.alightStopId,
+            nextBus: firstEta
+                ? `${firstEta.eta}（${firstEta.mins} 分鐘）`
+                : "查唔到",
+            dest: firstEta?.dest || "",
+        };
+    });
+
+    return {
+        originNearby: origStops.map((s: any) => ({
+            stop: s.stop,
+            name: s.name,
+            dist_m: s.dist_m,
+        })),
+        destinationNearby: destStops.map((s: any) => ({
+            stop: s.stop,
+            name: s.name,
+            dist_m: s.dist_m,
+        })),
+        directOptions,
+    };
+}
+
 /**
  * 由「出發地 → 目的地」搵交通方法：
  *   1) MTR：兩邊都 match 到車站就俾港鐵路線
- *   2) 巴士：geocode → 最近車站 → 搵有冇巴士直達（路線相同 + 上車站喺落車站前面）
+ *   2) 九巴(KMB)：geocode → 最近車站 → 搵有冇直達（路線相同 + 上車站喺落車站前面）
+ *   3) 城巴(CTB)：同上，但用 mirror 嘅 stop→routes / route→stops 做配對
  */
 export async function planJourney(
     origin: string,
     destination: string
 ): Promise<any> {
-    const result: any = { origin, destination, mtr: null, bus: null };
+    const result: any = {
+        origin,
+        destination,
+        mtr: null,
+        bus: null,
+        citybus: null,
+    };
 
     // MTR
     const fromStation = matchStation(origin);
@@ -648,6 +972,13 @@ export async function planJourney(
             destinationNearby: destStops,
             directOptions: candidates.slice(0, 8),
         };
+
+        // 城巴（CTB）直達
+        try {
+            result.citybus = await planCitybusDirect(originPoint, destPoint);
+        } catch (err: any) {
+            console.log("⚠️ 城巴行程規劃失敗:", err?.message || err);
+        }
     }
 
     return result;

@@ -75,9 +75,6 @@ export async function getDeepSeekResponse({
             toolNames: toolCalls?.map((tc: any) => tc.function.name),
             message: msg?.content || null,
         });
-        console.log("...testing...");
-        console.log(toolCalls);
-        console.log(msg?.content, "321");
         return {
             message: msg?.content || null,
             toolCalls: toolCalls,
