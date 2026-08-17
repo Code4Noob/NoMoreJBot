@@ -415,7 +415,8 @@ async function handleAIRequest(
         chatContext.push(chatMsg);
 
         const MAX_TOOL_ROUNDS = 5;
-        const MAX_TOKENS_PER_QUESTION = 10000000;
+        const MAX_TOKENS_PER_QUESTION =
+            Number(process.env.MAX_TOKENS_PER_QUESTION) || 10000000;
         // 將剩餘 tool call 次數話俾 LLM 知，等佢接近 limit 就自己收手俾結論
         const buildSystemPrompt = (roundsLeft: number) => {
             const note =
