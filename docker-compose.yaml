@@ -1,3 +1,5 @@
+# 開發模式（改 code 自動 rebuild + restart）：
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml up
 services:
   mongo:
     image: mongo:7
@@ -7,8 +9,8 @@ services:
       # Mongo data 持久化（container 刪咗 / 重建都唔會冇咗）
       - mongo-data:/data/db
     # 想喺本機直接用 mongosh / Compass 先開呢個 port（預設唔開，淨係俾 app 內網連）
-    # ports:
-    #   - "27017:27017"
+    ports:
+      - "27017:27017"
 
   app:
     build: .
@@ -53,11 +55,14 @@ services:
       - ./src/ai/skills:/app/src/ai/skills
       # VPN 設定（surfshark-sg.ovpn + creds）——由 host 掛入 container
       - ./vpn:/app/vpn
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./tsconfig.json:/app/tsconfig.json
       # 可選：聊天歷史 + log 都 persist 到 host（有需要先 uncomment）
       # - ./chat:/app/chat
       # - ./log:/app/log
     # 開機時確保 runtime 目錄存在（尤其係 mount chat/log 時要有 chat/history 子目錄）
-    command: sh -c "mkdir -p chat/history log && exec node dist/index.js"
+    command: sh -c "mkdir -p chat/history log && exec pnpm dev"
 
 volumes:
   mongo-data:

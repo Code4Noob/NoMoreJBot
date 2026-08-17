@@ -414,20 +414,37 @@ async function handleAIRequest(
         if (imgData) chatMsg.imageData = imgData;
         chatContext.push(chatMsg);
 
+        const MAX_TOOL_ROUNDS = 5;
+        const MAX_TOKENS_PER_QUESTION = 10000000;
+        // 將剩餘 tool call 次數話俾 LLM 知，等佢接近 limit 就自己收手俾結論
+        const buildSystemPrompt = (roundsLeft: number) => {
+            const note =
+                roundsLeft <= 0
+                    ? "你已經用盡工具 call 嘅限額，必須直接根據現有資料俾最終答案，唔好再 call 任何工具。"
+                    : `你最多可以再 call ${roundsLeft} 次工具（單次問題 token 預算約 ${MAX_TOKENS_PER_QUESTION}）。call 完後就算資料唔夠，都要直接俾最終答案，唔好無止境咁 call 工具。`;
+            return `${getSystemPrompt(ctx.from?.id)}\n\n[系統提示] ${note}`;
+        };
+
         let {
             message: reply,
             usage,
             toolCalls,
         } = await getAIResponse({
             messages: chatContext.slice(-6),
-            systemPrompt: getSystemPrompt(ctx.from?.id),
+            systemPrompt: buildSystemPrompt(MAX_TOOL_ROUNDS),
         });
 
+        await sendSectioned(ctx, reply || "正在處理你的需求");
+
         // Handle model function calls in a loop (Gemini may make multiple calls)
-        let maxToolRounds = 5;
-        let retryTimes = 2;
-        while (toolCalls && maxToolRounds > 0) {
-            maxToolRounds--;
+        let toolRoundsLeft = MAX_TOOL_ROUNDS;
+        let currentTokenUsage = usage; // 由初次 call 開始累計
+        while (
+            toolCalls &&
+            toolRoundsLeft > 0 &&
+            currentTokenUsage < MAX_TOKENS_PER_QUESTION
+        ) {
+            toolRoundsLeft--;
             contextMessages.push({
                 role: "assistant",
                 content: null,
@@ -437,6 +454,20 @@ async function handleAIRequest(
                 toolCalls.map(async (toolCall) => {
                     const { name, arguments: args } = toolCall.function;
                     const handler = functionHandlers[name];
+                    if (typeof handler !== "function") {
+                        console.log(
+                            `⚠️ 未知 tool: ${name}（model 幻覺，唔存在）`
+                        );
+                        contextMessages.push({
+                            name,
+                            role: "tool",
+                            content: JSON.stringify({
+                                error: `Tool "${name}" does not exist. Only use the tools provided in the tools list.`,
+                            }),
+                            tool_call_id: toolCall.id,
+                        });
+                        return;
+                    }
                     const functionResult = await handler(JSON.parse(args));
                     contextMessages.push({
                         name,
@@ -446,15 +477,16 @@ async function handleAIRequest(
                     });
                 })
             );
-            const geminiResponse = await getAIResponse({
+            const generalResponse = await getAIResponse({
                 messages: contextMessages,
-                systemPrompt: getSystemPrompt(ctx.from?.id),
+                systemPrompt: buildSystemPrompt(toolRoundsLeft),
             });
-            if (geminiResponse.message) {
-                reply = geminiResponse.message;
+            if (generalResponse.message) {
+                reply = generalResponse.message;
             }
-            usage += geminiResponse.usage;
-            toolCalls = geminiResponse.toolCalls;
+            usage += generalResponse.usage;
+            currentTokenUsage += generalResponse.usage;
+            toolCalls = generalResponse.toolCalls;
         }
 
         // Fallback if message is still null after all tool rounds
