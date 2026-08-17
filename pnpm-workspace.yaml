@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: true
+  playwright: true
+  playwright-core: true
