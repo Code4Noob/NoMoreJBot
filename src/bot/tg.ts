@@ -435,7 +435,9 @@ async function handleAIRequest(
             systemPrompt: buildSystemPrompt(MAX_TOOL_ROUNDS),
         });
 
-        await sendSectioned(ctx, reply || "正在處理你的需求");
+        if (toolCalls) {
+            await sendSectioned(ctx, reply || "正在處理你的需求");
+        }
 
         // Handle model function calls in a loop (Gemini may make multiple calls)
         let toolRoundsLeft = MAX_TOOL_ROUNDS;
