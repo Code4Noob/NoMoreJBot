@@ -1,5 +1,14 @@
 import { getCachedStickers } from "../tools/sticker";
 import { crawlUrlToText } from "../tools/crawler";
+import {
+    searchKmbRoutes,
+    getKmbRouteStops,
+    getKmbStopEta,
+    findNearbyKmbStops,
+    getMtrLines,
+    findMtrRoute,
+    planJourney,
+} from "../tools/transportation";
 
 // OpenAI-format tool list（DeepSeek / GPT 用）
 export const toolList = [
@@ -7,35 +16,174 @@ export const toolList = [
         type: "function",
         function: {
             name: "get_url_text_content",
-            description: "Get the main text content of a website specified by an URL (renders JS pages)",
+            description:
+                "Get the main text content of a website specified by an URL (renders JS pages)",
             parameters: {
                 type: "object",
                 properties: {
                     url: {
                         type: "string",
-                        description: "URL to the https website where text content will be obtained",
-                    }
+                        description:
+                            "URL to the https website where text content will be obtained",
+                    },
                 },
                 required: ["url"],
-            }
-        }
+            },
+        },
     },
     {
         type: "function",
         function: {
             name: "get_cached_stickers",
-            description: "Get the list of cached stickers (stickerId, meaning, emoji) that the bot can send. Use a returned stickerId in the reply as [sticker]: <stickerId> to send that sticker.",
+            description:
+                "Get the list of cached stickers (stickerId, meaning, emoji) that the bot can send. Use a returned stickerId in the reply as [sticker]: <stickerId> to send that sticker.",
             parameters: {
                 type: "object",
                 properties: {},
-            }
-        }
-    }
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "kmb_search_routes",
+            description:
+                "搜尋九巴(KMB)/龍運(LWB)巴士路線，用路線號或起點/終點地名做關鍵字。回傳路線號、方向(bound: O=去程/I=回程)、起點同終點。",
+            parameters: {
+                type: "object",
+                properties: {
+                    keyword: {
+                        type: "string",
+                        description:
+                            "路線號（例如「1A」）或地名（例如「尖沙咀」）",
+                    },
+                },
+                required: ["keyword"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "kmb_get_route_stops",
+            description:
+                "攞某一條巴士路線嘅順序車站表（由起點到終點）。要先知道 route 同 bound。",
+            parameters: {
+                type: "object",
+                properties: {
+                    route: {
+                        type: "string",
+                        description: "路線號（例如「1A」）",
+                    },
+                    bound: {
+                        type: "string",
+                        description:
+                            "方向：O = 去程（outbound），I = 回程（inbound）",
+                    },
+                    service_type: {
+                        type: "string",
+                        description: "服務類型，通常係「1」，可以省略",
+                    },
+                },
+                required: ["route", "bound"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "kmb_get_stop_eta",
+            description:
+                "攞某個巴士站（用 stop id）下一班車嘅到站時間（ETA）。",
+            parameters: {
+                type: "object",
+                properties: {
+                    stop_id: {
+                        type: "string",
+                        description:
+                            "巴士站 ID（由 find_nearby_kmb_stops 或 kmb_get_route_stops 回傳）",
+                    },
+                },
+                required: ["stop_id"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "find_nearby_kmb_stops",
+            description:
+                "用地名搜尋附近嘅九巴巴士站（內部會做 geocoding 再搵最近車站）。俾唔到準確位置時先用。",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "地方名/地標（例如「旺角朗豪坊」）",
+                    },
+                },
+                required: ["query"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "mtr_get_lines",
+            description: "列出所有港鐵(MTR)路線同佢哋嘅車站。",
+            parameters: { type: "object", properties: {} },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "mtr_find_route",
+            description:
+                "搵兩個港鐵站之間嘅搭車路線（連轉車站）。輸入要用港鐵站名（繁體中文）。",
+            parameters: {
+                type: "object",
+                properties: {
+                    from: {
+                        type: "string",
+                        description: "出發車站名（例如「旺角」）",
+                    },
+                    to: {
+                        type: "string",
+                        description: "目的地車站名（例如「中環」）",
+                    },
+                },
+                required: ["from", "to"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "plan_journey",
+            description:
+                "綜合規劃「出發地 → 目的地」嘅交通方法：同時考慮港鐵（若兩邊都係車站）同九巴直達巴士（上車站喺落車站前面嘅路線），並回傳最近車站同下一班車時間。出發地/目的地可以用地名、地標或港鐵站名。",
+            parameters: {
+                type: "object",
+                properties: {
+                    origin: {
+                        type: "string",
+                        description: "出發地（例如「旺角朗豪坊」或「旺角」）",
+                    },
+                    destination: {
+                        type: "string",
+                        description:
+                            "目的地（例如「中環」或「銅鑼灣時代廣場」）",
+                    },
+                },
+                required: ["origin", "destination"],
+            },
+        },
+    },
 ];
 
 // 共用 tool handlers（provider 無關）
 export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
-    "get_url_text_content": async ({ url }: { url: string }) => {
+    get_url_text_content: async ({ url }: { url: string }) => {
         try {
             // Playwright 版：真 browser 渲染（支援 JS / SPA）+ 抽正文文字
             const { title, text } = await crawlUrlToText(url);
@@ -47,7 +195,7 @@ export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
             };
         }
     },
-    "get_cached_stickers": async () => {
+    get_cached_stickers: async () => {
         const stickers = getCachedStickers();
         return {
             count: stickers.length,
@@ -59,5 +207,63 @@ export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
                 pack: s.setName,
             })),
         };
+    },
+    kmb_search_routes: async ({ keyword }: { keyword: string }) => {
+        try {
+            const routes = await searchKmbRoutes(keyword);
+            return { count: routes.length, routes };
+        } catch (error) {
+            return { error: "KMB 路線搜尋失敗，請稍後再試" };
+        }
+    },
+    kmb_get_route_stops: async ({
+        route,
+        bound,
+        service_type = "1",
+    }: {
+        route: string;
+        bound: string;
+        service_type?: string;
+    }) => {
+        try {
+            const stops = await getKmbRouteStops(route, bound, service_type);
+            return { route, bound, count: stops.length, stops };
+        } catch (error) {
+            return { error: "攞唔到路線車站表" };
+        }
+    },
+    kmb_get_stop_eta: async ({ stop_id }: { stop_id: string }) => {
+        try {
+            const eta = await getKmbStopEta(stop_id);
+            return { stop_id, count: eta.length, eta };
+        } catch (error) {
+            return { error: "攞唔到到站時間" };
+        }
+    },
+    find_nearby_kmb_stops: async ({ query }: { query: string }) => {
+        try {
+            return await findNearbyKmbStops(query);
+        } catch (error) {
+            return { error: "搵唔到附近巴士站" };
+        }
+    },
+    mtr_get_lines: async () => {
+        return { lines: getMtrLines() };
+    },
+    mtr_find_route: async ({ from, to }: { from: string; to: string }) => {
+        return findMtrRoute(from, to);
+    },
+    plan_journey: async ({
+        origin,
+        destination,
+    }: {
+        origin: string;
+        destination: string;
+    }) => {
+        try {
+            return await planJourney(origin, destination);
+        } catch (error) {
+            return { error: "行程規劃失敗，請稍後再試" };
+        }
     },
 };

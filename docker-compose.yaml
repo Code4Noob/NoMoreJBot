@@ -1,0 +1,68 @@
+# 開發模式（改 code 自動 rebuild + restart）：
+#   docker compose -f docker-compose.yaml -f docker-compose.dev.yml up
+services:
+  mongo:
+    image: mongo:7
+    container_name: nomorejbot-mongo
+    restart: unless-stopped
+    volumes:
+      # Mongo data 持久化（container 刪咗 / 重建都唔會冇咗）
+      - mongo-data:/data/db
+    # 想喺本機直接用 mongosh / Compass 先開呢個 port（預設唔開，淨係俾 app 內網連）
+    ports:
+      - "27017:27017"
+
+  app:
+    build: .
+    container_name: nomorejbot
+    # restart: unless-stopped
+    depends_on:
+      - mongo
+    # 俾 bot 自己嘅 OpenVPN 用（起 tun + 改 ip rule/route）
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      TZ: Asia/Hong_Kong
+      # --- MongoDB（指去 compose 入面嘅 mongo service）---
+      MONGOURL: mongodb://mongo:27017
+      DB_NAME: ${DB_NAME:-nomorejbot}
+      # --- VPN：container 冇 TTY，一定要設 SUDO_PASSWORD 先會行自動起 VPN ---
+      # container 入面行 root，sudo 唔會真係問密碼，呢個值只係用嚟過 code 個 gate
+      SUDO_PASSWORD: ${SUDO_PASSWORD:-dummy}
+      # --- Telegram ---
+      BOT_TOKEN: ${BOT_TOKEN}
+      BOT_NAME: ${BOT_NAME}
+      # --- AI（gemini 預設 / deepseek / gpt）---
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      AI_SKILL: ${AI_SKILL:-base}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_IMAGE_MODEL: ${GEMINI_IMAGE_MODEL:-gemini-3.1-flash-lite-image}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AZURE_OPENAI_URL: ${AZURE_OPENAI_URL}
+      AZURE_OPENAI_KEY: ${AZURE_OPENAI_KEY}
+      # --- 聊天歷史 ---
+      CHAT_CONTEXT_SIZE: ${CHAT_CONTEXT_SIZE:-30}
+      MAX_HISTORY_LINES: ${MAX_HISTORY_LINES:-200}
+    volumes:
+      # 重點：skills 直接 link 去 host。
+      # AI 幫 user 建立嘅 skill 檔（src/ai/skills/users/{userId}.md）會直接寫入你部機，
+      # 唔會被困喺 docker container 入面。
+      - ./src/ai/skills:/app/src/ai/skills
+      # VPN 設定（surfshark-sg.ovpn + creds）——由 host 掛入 container
+      - ./vpn:/app/vpn
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./tsconfig.json:/app/tsconfig.json
+      # 可選：聊天歷史 + log 都 persist 到 host（有需要先 uncomment）
+      # - ./chat:/app/chat
+      # - ./log:/app/log
+    # 開機時確保 runtime 目錄存在（尤其係 mount chat/log 時要有 chat/history 子目錄）
+    command: sh -c "mkdir -p chat/history log && exec pnpm dev"
+
+volumes:
+  mongo-data:

@@ -6,7 +6,8 @@ import type { AIRequest, AIResponse, AIMessage } from "../types";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY as string;
 export const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
-const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
+const DEEPSEEK_BASE_URL =
+    process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 
 /**
  * DeepSeek provider（OpenAI-compatible chat completions API）
@@ -34,6 +35,8 @@ export async function getDeepSeekResponse({
         openAIMessages.push(m);
     }
 
+    console.log("🚀 ~ getDeepSeekResponse ~ openAIMessages:", openAIMessages);
+
     const requestBody: any = {
         model: DEEPSEEK_MODEL,
         messages: openAIMessages,
@@ -44,17 +47,19 @@ export async function getDeepSeekResponse({
     };
 
     try {
-        const { data } = await vpnAxios.post(
+        const res = await vpnAxios.post(
             `${DEEPSEEK_BASE_URL}/chat/completions`,
             requestBody,
             { headers: { Authorization: `Bearer ${DEEPSEEK_API_KEY}` } }
         );
 
+        const { data } = res;
         const choice = data.choices?.[0];
         const msg = choice?.message;
 
         const toolCalls = msg?.tool_calls?.map((tc: any) => ({
             id: tc.id,
+            type: tc.type ?? "function",
             function: {
                 name: tc.function.name,
                 arguments: tc.function.arguments,
@@ -70,15 +75,20 @@ export async function getDeepSeekResponse({
             toolNames: toolCalls?.map((tc: any) => tc.function.name),
             message: msg?.content || null,
         });
-
+        console.log("...testing...");
+        console.log(toolCalls);
+        console.log(msg?.content, "321");
         return {
             message: msg?.content || null,
-            toolCalls: toolCalls?.length ? toolCalls : undefined,
+            toolCalls: toolCalls,
             usage: data.usage?.total_tokens ?? 0,
             imageData: null,
         };
     } catch (error: any) {
-        console.log("🚀 ~ getDeepSeekResponse ~ error:", error?.response?.data || error.message);
+        console.log(
+            "🚀 ~ getDeepSeekResponse ~ error: 123",
+            error?.response?.data || error.message
+        );
         throw error;
     }
 }

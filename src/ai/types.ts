@@ -12,6 +12,7 @@ export interface AIMessage {
 
 export interface AIToolCall {
     id: string;
+    type?: string;
     function: {
         name: string;
         arguments: string;
