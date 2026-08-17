@@ -15,19 +15,17 @@
   "license": "ISC",
   "dependencies": {
     "axios": "1.2.0-alpha.1",
-    "cheerio": "^1.0.0",
     "dayjs": "^1.11.13",
     "esbuild": "^0.15.18",
     "esbuild-linux-64": "^0.15.18",
-    "moment-timezone": "^0.5.47",
     "mongoose": "^6.13.8",
     "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
     "node-openvpn": "^0.1.1",
     "playwright": "^1.62.1",
-    "sqlite3": "^5.1.7",
     "telegraf": "^4.16.3",
     "ts-node": "^10.9.2",
-    "typegram": "^4.3.0",
+    "undici": "^6.21.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
