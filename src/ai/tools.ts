@@ -8,6 +8,10 @@ import {
     getMtrLines,
     findMtrRoute,
     planJourney,
+    searchCitybusRoutes,
+    getCitybusRouteStops,
+    getCitybusStopEta,
+    findNearbyCitybusStops,
 } from "../tools/transportation";
 
 // OpenAI-format tool list（DeepSeek / GPT 用）
@@ -129,6 +133,87 @@ export const toolList = [
     {
         type: "function",
         function: {
+            name: "ctb_search_routes",
+            description:
+                "搜尋城巴(CTB)巴士路線，用路線號或起點/終點地名做關鍵字。回傳路線號、起點同終點。",
+            parameters: {
+                type: "object",
+                properties: {
+                    keyword: {
+                        type: "string",
+                        description:
+                            "路線號（例如「962」）或地名（例如「中環」）",
+                    },
+                },
+                required: ["keyword"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "ctb_get_route_stops",
+            description:
+                "攞某一條城巴(CTB)路線嘅順序車站表（由起點到終點）。要先知道 route 同 bound。",
+            parameters: {
+                type: "object",
+                properties: {
+                    route: {
+                        type: "string",
+                        description: "路線號（例如「962」）",
+                    },
+                    bound: {
+                        type: "string",
+                        description: "方向：outbound = 去程，inbound = 回程",
+                    },
+                },
+                required: ["route", "bound"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "ctb_get_stop_eta",
+            description:
+                "攞城巴(CTB)某個巴士站 + 某條路線嘅下一班車到站時間（ETA）。要先有 stop_id 同 route。",
+            parameters: {
+                type: "object",
+                properties: {
+                    stop_id: {
+                        type: "string",
+                        description: "巴士站 ID（由 ctb_get_route_stops 回傳）",
+                    },
+                    route: {
+                        type: "string",
+                        description: "路線號（例如「962」）",
+                    },
+                },
+                required: ["stop_id", "route"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "find_nearby_ctb_stops",
+            description:
+                "用地名搜尋附近嘅城巴(CTB)巴士站（內部做 geocoding 再搵最近車站）。俾唔到準確位置時先用。",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "地方名/地標（例如「中環」）",
+                    },
+                },
+                required: ["query"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
             name: "mtr_get_lines",
             description: "列出所有港鐵(MTR)路線同佢哋嘅車站。",
             parameters: { type: "object", properties: {} },
@@ -161,7 +246,7 @@ export const toolList = [
         function: {
             name: "plan_journey",
             description:
-                "綜合規劃「出發地 → 目的地」嘅交通方法：同時考慮港鐵（若兩邊都係車站）同九巴直達巴士（上車站喺落車站前面嘅路線），並回傳最近車站同下一班車時間。出發地/目的地可以用地名、地標或港鐵站名。",
+                "綜合規劃「出發地 → 目的地」嘅交通方法：同時考慮港鐵（若兩邊都係車站）、九巴(KMB)同城巴(CTB)直達巴士（上車站喺落車站前面嘅路線），並回傳最近車站同下一班車時間。出發地/目的地可以用地名、地標或港鐵站名。",
             parameters: {
                 type: "object",
                 properties: {
@@ -172,7 +257,7 @@ export const toolList = [
                     destination: {
                         type: "string",
                         description:
-                            "目的地（例如「中環」或「銅鑼灣時代廣場」）",
+                            "目的地（例如「中環」或「銅鑼灣時代廣場」）請預先幫user處理好出發地及目的地, 確保清晰",
                     },
                 },
                 required: ["origin", "destination"],
@@ -245,6 +330,49 @@ export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
             return await findNearbyKmbStops(query);
         } catch (error) {
             return { error: "搵唔到附近巴士站" };
+        }
+    },
+    ctb_search_routes: async ({ keyword }: { keyword: string }) => {
+        try {
+            const routes = await searchCitybusRoutes(keyword);
+            return { count: routes.length, routes };
+        } catch (error) {
+            return { error: "城巴路線搜尋失敗，請稍後再試" };
+        }
+    },
+    ctb_get_route_stops: async ({
+        route,
+        bound,
+    }: {
+        route: string;
+        bound: string;
+    }) => {
+        try {
+            const stops = await getCitybusRouteStops(route, bound);
+            return { route, bound, count: stops.length, stops };
+        } catch (error) {
+            return { error: "攞唔到城巴路線車站表" };
+        }
+    },
+    ctb_get_stop_eta: async ({
+        stop_id,
+        route,
+    }: {
+        stop_id: string;
+        route: string;
+    }) => {
+        try {
+            const eta = await getCitybusStopEta(stop_id, route);
+            return { stop_id, route, count: eta.length, eta };
+        } catch (error) {
+            return { error: "攞唔到城巴到站時間" };
+        }
+    },
+    find_nearby_ctb_stops: async ({ query }: { query: string }) => {
+        try {
+            return await findNearbyCitybusStops(query);
+        } catch (error) {
+            return { error: "搵唔到附近城巴巴士站" };
         }
     },
     mtr_get_lines: async () => {
