@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node ./dist",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "dev": "concurrently \"pnpm build:watch\" \"nodemon dist/index.js\"",
     "build": "node scripts/build.js",
     "build:watch": "node scripts/build.js -watch"
