@@ -556,9 +556,14 @@ async function handleAIRequest(
 
         if (genImageMatch) {
             const imagePrompt = genImageMatch[1].trim();
-            const cleanReply = isEdit
-                ? replyNoStickers.replace(genImageEditRegex, "").trim()
-                : replyNoStickers.replace(genImageRegex, "").trim();
+            // 剝走 gen image / sticker marker；[section] 喺相 caption 冇意義（唔會 sendSectioned），一併剝走變空格
+            const cleanReply = (
+                isEdit
+                    ? replyNoStickers.replace(genImageEditRegex, "")
+                    : replyNoStickers.replace(genImageRegex, "")
+            )
+                .replace(/\[section\]/g, " ")
+                .trim();
 
             try {
                 await ctx.reply(isEdit ? "執緊...📸" : "畫緊...");
