@@ -9,6 +9,8 @@
     "declaration": true,                      /* Generates corresponding '.d.ts' file. */
     "outDir": "dist",                          /* Redirect output structure to the directory. */
     "strict": true,                           /* Enable all strict type-checking options. */
+    "skipLibCheck": true,                     /* Skip type checking of declaration files (.d.ts). */
+    "types": ["bun"],                         /* Use Bun's type definitions (supersedes @types/node). */
     "allowSyntheticDefaultImports": true,     /* Allow default imports from modules with no default export. This does not affect code emit, just typechecking. */
     "esModuleInterop": true,                  /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */
   }

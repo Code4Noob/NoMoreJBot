@@ -19,19 +19,19 @@ Telegram bot（Telegraf）整合多個 AI model，支援圖片生成 / 圖片辨
 ## 快速開始
 
 ```bash
-# 安裝
-pnpm install
+# 安裝（Bun runtime + bun.lock）
+bun install
 
 # 設定環境
 cp .env.example .env
 # 填入 BOT_TOKEN（BotFather 攞）+ 至少一個 AI key
 
-# 開發（自動 rebuild + restart）
-pnpm dev
+# 開發（watch mode 自動 restart）
+bun run dev
 
 # Build + 啟動
-pnpm build
-pnpm start
+bun run build
+bun run start
 ```
 
 ## 環境變數（.env）
@@ -138,7 +138,7 @@ sudo apt install openvpn
 
 # 2. 將 Surfshark CA cert 貼入 vpn/surfshark-sg.ovpn 嘅 <ca>
 # 3. 連線（會自動偵測 tun IP，唔使設 env）
-sudo node scripts/vpn-connect.js
+sudo bun scripts/vpn-connect.js
 ```
 
 - `utils/vpn.ts` 自動偵測 tun interface IP，tunnel 未起就 fallback 普通 axios
@@ -162,7 +162,7 @@ sudo password，起咗 VPN 再重試一次。
 
 VPN 已經行緊（有 tun interface）時唔會再問，直接重試。
 Bot 唔喺 terminal 跑（例如 systemd / 背景）時會提示手動起：
-`sudo node scripts/vpn-connect.js`。
+`sudo bun scripts/vpn-connect.js`。
 
 > 如果你之前用舊版 `setup-vpn-autostart.sh` 裝過 passwordless rule，可以移除：
 > `sudo rm -f /etc/sudoers.d/nomorejbot-vpn`

@@ -25,6 +25,10 @@ import {
     toolsConfig,
 } from "../ai";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
+import {
+    registerReminderWizard,
+    handleReminderTextStep,
+} from "../reminder/reminder";
 const fs = require("fs");
 const path = require("path");
 import axios from "axios";
@@ -552,9 +556,14 @@ async function handleAIRequest(
 
         if (genImageMatch) {
             const imagePrompt = genImageMatch[1].trim();
-            const cleanReply = isEdit
-                ? replyNoStickers.replace(genImageEditRegex, "").trim()
-                : replyNoStickers.replace(genImageRegex, "").trim();
+            // 剝走 gen image / sticker marker；[section] 喺相 caption 冇意義（唔會 sendSectioned），一併剝走變空格
+            const cleanReply = (
+                isEdit
+                    ? replyNoStickers.replace(genImageEditRegex, "")
+                    : replyNoStickers.replace(genImageRegex, "")
+            )
+                .replace(/\[section\]/g, " ")
+                .trim();
 
             try {
                 await ctx.reply(isEdit ? "執緊...📸" : "畫緊...");
@@ -613,6 +622,9 @@ bot.mention(process.env.BOT_NAME as string, (ctx: any) => handleAIRequest(ctx));
 
 // Direct message / reply-to-bot 都會 AI 回應（即使冇 @bot）
 bot.on("text", (ctx: any, next: any) => {
+    // 等緊 reminder 內容 -> 幫佢 capture 埋跟住揀日期時間
+    if (handleReminderTextStep(ctx)) return;
+
     const text = ctx.message?.text || "";
     const isCommand = text.startsWith("/"); // commands 留返俾 bot.command() 處理
     const isPrivate = ctx.chat?.type === "private"; // 私訊 bot 唔使 @
@@ -892,6 +904,9 @@ bot.action("marksix_remind_off", async (ctx: any) => {
             : `❌ 呢個 group 冇設定過馬會提醒`
     );
 });
+
+// Reminder 精靈（/reminder + 提我/remind 觸發）
+registerReminderWizard(bot);
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));

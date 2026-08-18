@@ -17,12 +17,12 @@
 
 ## How it was verified
 <!-- How did you test it? e.g. commands run, manual test steps, CI results. -->
-- [ ] `tsc --noEmit` (no new errors — known pre-existing `tg.ts` + telegraf `.d.ts` errors are OK)
-- [ ] `pnpm build` passes
+- [ ] `bunx tsc --noEmit` (no new errors — known pre-existing `tg.ts` errors are OK)
+- [ ] `bun run build` passes
 - [ ] Manual test in Telegram (if applicable)
 
 ## Checklist
 - [ ] Code builds and typechecks (see above)
 - [ ] Added / updated relevant command in `src/bot/commands.ts` (if new command)
-- [ ] Synced lockfiles if dependencies changed (`pnpm install --lockfile-only` + `npm install --package-lock-only`)
+- [ ] Updated `bun.lock` if dependencies changed (`bun install`)
 - [ ] No secrets committed (`.env` etc.)

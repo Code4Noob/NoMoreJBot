@@ -21,6 +21,40 @@ const MGMT_PORT = 7505;
 const ROUTE_TABLE = 100;
 const LOG_FILE = path.resolve("vpn/openvpn.log");
 
+// 需要行 VPN 嘅 API host。Bun 唔 honor http.Agent localAddress，
+// 所以除咗 source-based rule，仲要加 destination-based rule 先 cover 到 Bun。
+const VPN_DEST_HOSTS = ["generativelanguage.googleapis.com"];
+
+/**
+ * 加 destination-based policy routing：所有去 AI API host 嘅流量直接經 tunnel 出街。
+ * 唔依賴 app 層 bind socket（Bun 唔 honor localAddress），runtime-agnostic。
+ * 每次 VPN 連線都會 refresh（重新 resolve host），IP 變咗都會自動跟。
+ */
+function addDestRules() {
+    // 清走舊 to-rule（tolerate 唔存在）
+    try {
+        const out = execSync("ip rule show", { encoding: "utf-8" });
+        for (const line of out.split("\n")) {
+            const m = line.match(/to ([0-9.]+)(?:\/\d+)?\s+lookup (\d+)/);
+            if (m && m[2] === String(ROUTE_TABLE)) {
+                execSync(`ip rule del to ${m[1]} lookup ${ROUTE_TABLE} 2>/dev/null; true`);
+            }
+        }
+    } catch (_) { /* ignore */ }
+
+    for (const host of VPN_DEST_HOSTS) {
+        let ips = [];
+        try {
+            ips = execSync(`getent ahostsv4 ${host} | awk '{print $1}' | sort -u`, { encoding: "utf-8" })
+                .trim().split("\n").filter(Boolean);
+        } catch (_) { /* ignore */ }
+        for (const ip of ips) {
+            try { execSync(`ip rule add to ${ip} lookup ${ROUTE_TABLE}`); } catch (_) { /* ignore */ }
+        }
+        console.log(`🌐 ${host} -> tunnel 路由 (${ips.join(", ") || "無 IP"})`);
+    }
+}
+
 // ---------- policy routing ----------
 function finalize() {
     try {
@@ -59,6 +93,7 @@ function finalize() {
         execSync(`ip route flush table ${ROUTE_TABLE} 2>/dev/null; true`);
         execSync(`ip route add default via ${gw} dev ${link} table ${ROUTE_TABLE}`);
         execSync(`ip rule add from ${tunNet} lookup ${ROUTE_TABLE}`);
+        addDestRules();
 
         console.log("🔍 測試: curl --interface " + tunIP + " https://api.ipify.org");
         process.exit(0);
@@ -102,14 +137,39 @@ const vpn = openvpnmanager.connect(opts);
 vpn.on("error", (err) => console.error("⚠️ mgmt:", err?.message || err));
 
 let gotIP = false;
+let finalized = false;
+
+// 設定 routing（只行一次）。等 tun 完全就緒先 finalize（加 2 秒 delay）。
+function runFinalize() {
+    if (finalized) return;
+    finalized = true;
+    clearInterval(pollTimer);
+    console.log("✅ CONNECTED，設定 routing...");
+    setTimeout(finalize, 2000); // 等 tun 完全就緒
+}
+
+// 獨立 poll tunnel readiness —— node-openvpn 喺 container 入面 connect management
+// port (7505) 有 ECONNREFUSED race（openvpn 未 bind 就 connect，又唔會自動 retry），
+// 唔可以淨係靠佢嘅 state-change event。有 tun interface + IPv4 就算 ready。
+const pollTimer = setInterval(() => {
+    if (gotIP || finalized) return;
+    try {
+        const tun = execSync("ip -o link show | grep -oE 'tun[0-9]+' | head -1", { encoding: "utf-8" }).trim();
+        if (!tun) return;
+        const ip = execSync(`ip -4 -o addr show ${tun} 2>/dev/null | awk '{print $4}' | head -1`, { encoding: "utf-8" }).trim();
+        if (!ip) return;
+        gotIP = true;
+        runFinalize();
+    } catch (_) { /* 未 ready */ }
+}, 1000);
+
 vpn.on("state-change", (state) => {
     // node-openvpn 將 ">STATE:<time>,<STATE>,<desc>" split 成 [time, state, desc]
     const stateName = Array.isArray(state) ? state[1] : state;
     console.log("🔄 state:", stateName);
     if (stateName === "CONNECTED" && !gotIP) {
         gotIP = true;
-        console.log("✅ CONNECTED，設定 routing...");
-        setTimeout(finalize, 2000); // 等 tun 完全就緒
+        runFinalize();
     }
 });
 

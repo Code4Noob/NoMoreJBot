@@ -1,4 +1,8 @@
-import { connect, disconnect, set, connection } from "mongoose";
+import mongoose from "mongoose";
+
+// Bun 嘅 CJS-ESM interop 認唔到 mongoose 嘅 named export `connection`
+// （cjs-module-lexer 偵測唔到），所以要經 default import 攞。
+const { connect, disconnect, set, connection } = mongoose;
 
 // Connection URL
 const url =

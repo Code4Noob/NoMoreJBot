@@ -30,7 +30,7 @@ const POLL_TIMEOUT_MS = 20 * 1000;
 
 /**
  * 搵 repo root（裝住 scripts/vpn-connect.js 嘅目錄）。
- * esbuild 會將成個 bundle 收埋入 dist/index.js，所以 __dirname 唔可靠；
+ * bun build 會將成個 bundle 收埋入 dist/index.js，所以 __dirname 唔可靠；
  * 優先信 cwd（bot 由 repo root 啟動），fallback 由 __dirname 向上搵。
  */
 function findRepoRoot(): string {
@@ -59,20 +59,21 @@ function runVPNConnect(): Promise<void> {
         if (!sudoPassword && !process.stdin.isTTY) {
             reject(
                 new Error(
-                    "冇 terminal 問 sudo password，又冇設 SUDO_PASSWORD — 請手動執行: sudo node scripts/vpn-connect.js"
+                    "冇 terminal 問 sudo password，又冇設 SUDO_PASSWORD — 請手動執行: sudo bun scripts/vpn-connect.js"
                 )
             );
             return;
         }
 
-        const nodeBin = process.execPath;
+        // Bun runtime 底下 process.execPath = /path/to/bun
+        const runtimeBin = process.execPath;
         const repoRoot = findRepoRoot();
         const scriptPath = path.join(repoRoot, "scripts", "vpn-connect.js");
 
         let proc;
         if (sudoPassword) {
             // 用 .env 密碼非互動：sudo -S 由 stdin 讀密碼（唔會 log / 儲低，淨係餵俾 sudo）
-            proc = spawn("sudo", ["-S", "-p", "", nodeBin, scriptPath], {
+            proc = spawn("sudo", ["-S", "-p", "", runtimeBin, scriptPath], {
                 cwd: repoRoot,
                 stdio: ["pipe", "inherit", "inherit"],
             });
@@ -83,7 +84,7 @@ function runVPNConnect(): Promise<void> {
             console.log(
                 "🔐 要啟動 VPN — 請喺呢個 terminal 輸入 sudo password（只今次用，唔會儲低）"
             );
-            proc = spawn("sudo", [nodeBin, scriptPath], {
+            proc = spawn("sudo", [runtimeBin, scriptPath], {
                 cwd: repoRoot,
                 stdio: "inherit",
             });
