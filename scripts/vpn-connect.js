@@ -155,14 +155,39 @@ const vpn = openvpnmanager.connect(opts);
 vpn.on("error", (err) => console.error("⚠️ mgmt:", err?.message || err));
 
 let gotIP = false;
+let finalized = false;
+
+// 設定 routing（只行一次）。等 tun 完全就緒先 finalize（加 2 秒 delay）。
+function runFinalize() {
+    if (finalized) return;
+    finalized = true;
+    clearInterval(pollTimer);
+    console.log("✅ CONNECTED，設定 routing...");
+    setTimeout(finalize, 2000); // 等 tun 完全就緒
+}
+
+// 獨立 poll tunnel readiness —— node-openvpn 喺 container 入面 connect management
+// port (7505) 有 ECONNREFUSED race（openvpn 未 bind 就 connect，又唔會自動 retry），
+// 唔可以淨係靠佢嘅 state-change event。有 tun interface + IPv4 就算 ready。
+const pollTimer = setInterval(() => {
+    if (gotIP || finalized) return;
+    try {
+        const tun = execSync("ip -o link show | grep -oE 'tun[0-9]+' | head -1", { encoding: "utf-8" }).trim();
+        if (!tun) return;
+        const ip = execSync(`ip -4 -o addr show ${tun} 2>/dev/null | awk '{print $4}' | head -1`, { encoding: "utf-8" }).trim();
+        if (!ip) return;
+        gotIP = true;
+        runFinalize();
+    } catch (_) { /* 未 ready */ }
+}, 1000);
+
 vpn.on("state-change", (state) => {
     // node-openvpn 將 ">STATE:<time>,<STATE>,<desc>" split 成 [time, state, desc]
     const stateName = Array.isArray(state) ? state[1] : state;
     console.log("🔄 state:", stateName);
     if (stateName === "CONNECTED" && !gotIP) {
         gotIP = true;
-        console.log("✅ CONNECTED，設定 routing...");
-        setTimeout(finalize, 2000); // 等 tun 完全就緒
+        runFinalize();
     }
 });
 
