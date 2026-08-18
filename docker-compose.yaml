@@ -62,7 +62,7 @@ services:
       # - ./chat:/app/chat
       # - ./log:/app/log
     # 開機時確保 runtime 目錄存在（尤其係 mount chat/log 時要有 chat/history 子目錄）
-    command: sh -c "mkdir -p chat/history log && exec pnpm dev"
+    command: sh -c "mkdir -p chat/history log && exec bun run dev"
 
 volumes:
   mongo-data:

@@ -1,8 +1,8 @@
 /**
- * 交通工具工具嘅 smoke test（直接用 ts-node 跑，唔使開 bot）。
+ * 交通工具工具嘅 smoke test（直接用 Bun 跑，唔使開 bot）。
  *
  * 用法：
- *   node -r ts-node/register scripts/test-transport.ts
+ *   bun scripts/test-transport.ts
  *
  * 覆蓋：MTR 路線（純本地）、KMB 路線搜尋 / 車站 / ETA、geocoding + 附近車站、
  * 綜合行程規劃（MTR + 九巴直達巴士）。

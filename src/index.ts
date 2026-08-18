@@ -1,5 +1,4 @@
-import "dotenv/config";
-
+// Bun 會自動 load .env，唔使 dotenv
 import bot from './bot/tg';
 import { dbConnect } from "./db";
 import { reloadMarkSixReminders } from "./scheduler/marksix";

@@ -23,8 +23,7 @@ What actually happened (include the bot's reply / error message).
 
 ## Environment
 - OS / WSL: (e.g. Windows 11 + WSL2)
-- Node version: (e.g. `node -v`)
-- pnpm version: (e.g. `pnpm -v`)
+- Bun version: (e.g. `bun --version`)
 - AI provider: (`gemini` / `deepseek` / `gpt`)
 
 ## Logs
