@@ -511,15 +511,17 @@ async function handleAIRequest(
         if (!reply) reply = "冇嘢想講";
 
         // 🧠 處理 [user_skill]: 更新對某 user 嘅專屬人格
-        const userSkillIdx = reply.indexOf("[user_skill]:");
-        if (userSkillIdx !== -1 && ctx.from?.id) {
-            const content = reply
-                .slice(userSkillIdx + "[user_skill]:".length)
-                .trim();
+        // 相容大小階 + 兩種格式：[user_skill]: <人格>（冒號喺外）同 [user_skill: <人格>]（冒號喺內）
+        const userSkillMatch = reply.match(
+            /\[user_skill\]\s*:\s*([\s\S]*)$|\[user_skill:\s*([\s\S]*?)\]/i
+        );
+        if (userSkillMatch && ctx.from?.id) {
+            const content = (userSkillMatch[1] || userSkillMatch[2] || "").trim();
             if (content) saveUserSkill(ctx.from.id, content);
             // 剝走 marker 同內容，淨係顯示原本嘅回覆
             reply =
-                reply.slice(0, userSkillIdx).trim() || "已更新對你嘅專屬人格";
+                reply.slice(0, userSkillMatch.index).trim() ||
+                "已更新對你嘅專屬人格";
         }
 
         fs.appendFile(
