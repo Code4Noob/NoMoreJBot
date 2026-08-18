@@ -5,6 +5,7 @@ Telegram bot（Telegraf）整合多個 AI model，支援圖片生成 / 圖片辨
 ## 功能
 
 - **AI 對話** — @bot 即可對話，支援 tool calling（讀取 URL 內容）
+- **網上搜尋** — AI 可用 `web_search` 搜尋並查證（歌詞 / 新聞 / 冷知識等），唔使靠記憶
 - **多 AI Provider** — 可切換 Gemini / DeepSeek / GPT
 - **圖片生成** — AI 回覆含 `gen image <描述>` 就自動生圖
 - **圖片辨識** — 傳相 + @bot caption 即分析

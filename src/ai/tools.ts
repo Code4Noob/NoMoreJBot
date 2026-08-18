@@ -1,5 +1,5 @@
 import { getCachedStickers } from "../tools/sticker";
-import { crawlUrlToText } from "../tools/crawler";
+import { crawlUrlToText, searchWeb } from "../tools/crawler";
 import {
     searchKmbRoutes,
     getKmbRouteStops,
@@ -48,6 +48,25 @@ export const toolList = [
                     },
                 },
                 required: ["url"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "web_search",
+            description:
+                "Search the web and return top results (title, url, snippet). Use when you need to find or verify information and don't know the exact URL (song lyrics, facts, news, prices, etc.).",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description:
+                            "The search query (e.g. 「周柏豪 宏願 歌詞」)",
+                    },
+                },
+                required: ["query"],
             },
         },
     },
@@ -285,15 +304,32 @@ export const toolList = [
 // 共用 tool handlers（provider 無關）
 export const functionHandlers: Record<string, (args: any) => Promise<any>> = {
     get_url_text_content: async ({ url }: { url: string }) => {
+        console.log(`🔗 get_url_text_content: ${url}`);
         try {
             // Playwright 版：真 browser 渲染（支援 JS / SPA）+ 抽正文文字
             const { title, text } = await crawlUrlToText(url);
+            console.log(
+                `✅ get_url_text_content OK: ${url} (title=${title}, ${text.length} chars)`
+            );
             return { siteTitle: title, textContent: text };
         } catch (error) {
+            console.log(
+                `❌ get_url_text_content FAIL: ${url}`,
+                (error as any)?.message || error
+            );
             return {
                 siteTitle: "Error while trying to get title",
                 textContent: "Error while trying to get body text",
             };
+        }
+    },
+    web_search: async ({ query }: { query: string }) => {
+        try {
+            const results = await searchWeb(query);
+            return { query, count: results.length, results };
+        } catch (error) {
+            console.log("❌ web_search 失敗:", (error as any)?.message || error);
+            return { query, error: "搜尋失敗，請稍後再試" };
         }
     },
     get_cached_stickers: async () => {
