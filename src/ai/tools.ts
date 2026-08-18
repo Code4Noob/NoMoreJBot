@@ -14,6 +14,22 @@ import {
     findNearbyCitybusStops,
 } from "../tools/transportation";
 
+// 通用 config：call tool 時會唔會出「正在處理你的需求」greeting（per tool）
+// 每個 tool 名對應一個開關：true = 會出，冇列到 / false = 唔出
+// 喺 tg.ts 讀 toolsConfig.showGreeting[toolName] 決定
+//（改「tools.showGreeting.<tool名>」就得，唔使改 tg.ts）
+export const toolsConfig: { showGreeting: Record<string, boolean> } = {
+    showGreeting: {
+        // 路線工具（KMB / MTR）先出 greeting
+        kmb_search_routes: true,
+        kmb_get_route_stops: true,
+        kmb_get_stop_eta: true,
+        find_nearby_kmb_stops: true,
+        mtr_get_lines: true,
+        mtr_find_route: true,
+    },
+};
+
 // OpenAI-format tool list（DeepSeek / GPT 用）
 export const toolList = [
     {

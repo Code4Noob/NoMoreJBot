@@ -1,7 +1,7 @@
 import { getGeminiResponse, getGeminiImage, GEMINI_MODEL } from "./models/gemini";
 import { getDeepSeekResponse, DEEPSEEK_MODEL } from "./models/deepseek";
 import { getGptResponse, GPT_MODEL } from "./models/gpt";
-import { functionHandlers, toolList } from "./tools";
+import { functionHandlers, toolList, toolsConfig } from "./tools";
 import type { AIRequest, AIResponse } from "./types";
 
 /**
@@ -33,6 +33,6 @@ export async function getAIResponse(opts: AIRequest): Promise<AIResponse> {
     }
 }
 
-export { functionHandlers, toolList };
+export { functionHandlers, toolList, toolsConfig };
 export { getGeminiImage };
 export type { AIRequest, AIResponse, AIMessage } from "./types";

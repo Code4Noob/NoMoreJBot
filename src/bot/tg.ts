@@ -18,7 +18,12 @@ import {
     resolveStickerId,
 } from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
-import { getAIResponse, getGeminiImage, functionHandlers } from "../ai";
+import {
+    getAIResponse,
+    getGeminiImage,
+    functionHandlers,
+    toolsConfig,
+} from "../ai";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 const fs = require("fs");
 const path = require("path");
@@ -435,8 +440,14 @@ async function handleAIRequest(
             systemPrompt: buildSystemPrompt(MAX_TOOL_ROUNDS),
         });
 
-        if (toolCalls && reply) {
-            await sendSectioned(ctx, reply);
+        // call tool 時會唔會出「正在處理你的需求」greeting
+        //（per tool 開關喺 src/ai/tools.ts 嘅 toolsConfig.showGreeting[toolName]）
+        const callsGreetingTool = toolCalls?.some(
+            (tc: any) => toolsConfig.showGreeting[tc.function?.name]
+        );
+
+        if (toolCalls && callsGreetingTool) {
+            await sendSectioned(ctx, reply || "正在處理你的需求");
         }
 
         // Handle model function calls in a loop (Gemini may make multiple calls)
