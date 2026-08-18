@@ -24,8 +24,7 @@ const BOT_COMMANDS: BotCommandEntry[] = [
     command: 'transportation',
     description:
       ' Suggest transportation options to user in order to reach the destination.',
-  },
-];
+  },  { command: 'reminder', description: 'Set a reminder (date/time picker)' },];
 
 /**
  * 自動註冊 bot commands（setMyCommands）——唔使 BotFather。

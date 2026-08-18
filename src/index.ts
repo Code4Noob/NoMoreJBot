@@ -3,6 +3,7 @@ import "dotenv/config";
 import bot from './bot/tg';
 import { dbConnect } from "./db";
 import { reloadMarkSixReminders } from "./scheduler/marksix";
+import { loadPendingReminders } from "./reminder/reminder";
 import { registerBotCommands } from "./bot/commands";
 
 async function main() {
@@ -10,6 +11,8 @@ async function main() {
         // 等 DB 連好先載入 marksix reminder config 並排程
         await dbConnect();
         await reloadMarkSixReminders(bot);
+        // 重新排程未 send 嘅 user reminder
+        await loadPendingReminders(bot);
     } catch (error) {
         console.log("❌ startup error:", error);
     }
