@@ -62,12 +62,17 @@ src/
 ├── ai/                    # AI abstraction（provider 無關）
 │   ├── index.ts           # Dispatcher：getAIResponse() 按 AI_PROVIDER 揀 model
 │   ├── types.ts           # 共用 AI 型別
-│   ├── skill.ts           # 載入 skill.md（按 AI_SKILL 切換）
+│   ├── skill.ts           # 載入 SKILL.md（Agent Skills 格式，按 AI_SKILL 切換）
 │   ├── logger.ts          # 統一 AI response logging
 │   ├── tools.ts           # 共用 tool list + functionHandlers
-│   ├── skills/            # skillset（真實 .md gitignored，.example 可 commit）
-│   │   ├── skill.md
-│   │   └── skill.md.example
+│   ├── skills/            # Agent Skills（base / users gitignored，utils 照 commit）
+│   │   ├── base/
+│   │   │   └── SKILL.md   # base persona（按 AI_SKILL 切換，可多個）
+│   │   ├── base.md.example
+│   │   ├── users/
+│   │   │   └── {userId}/SKILL.md   # per-user 人格（gitignored）
+│   │   └── utils/
+│   │       └── {name}/SKILL.md     # 通用工具指示（behavior / image / sticker…）
 │   └── models/            # AI providers
 │       ├── gemini.ts
 │       ├── deepseek.ts
@@ -102,31 +107,40 @@ GEMINI_IMAGE_MODEL=gemini-3.1-flash-lite-image  # 生圖
 
 ## Skillset（persona）
 
+全部用 Agent Skills 格式：每個 skill 一個 folder，入面有 `SKILL.md`（YAML frontmatter：`name` + `description`，`name` 要同 folder 名一致）。
+
 ### Base skill（人人通用）
 
-`src/ai/skills/` 放 base 人格，用 `AI_SKILL` 切換：
+`src/ai/skills/<AI_SKILL>/SKILL.md` 放 base 人格，用 `AI_SKILL` 切換：
 
 ```env
 AI_SKILL=base    # 預設
 AI_SKILL=admin
 ```
 
-- 真實 `base.md` 係 gitignored（可能含 persona / config）
+- 真實 `base/SKILL.md` 係 gitignored（可能含 persona / config）
 - 參考 `base.md.example` 整新 skillset
+
+### Utility skills（工具指示）
+
+`src/ai/skills/utils/{name}/SKILL.md` 放通用工具/行為指示（behavior / communication / image / photo-edit / sticker / time / user-personality），會合併入 system prompt（順序 base → utils → users）：
+
+- **照 commit**（唔 gitignore）
+- loader 會剝走 frontmatter，用 `name` 做 `[skill: 名稱]` 標頭
 
 ### Per-user skill（每個 user 獨有人格）
 
-每個 user 可以喺 `src/ai/skills/users/{userId}.md` 放專屬人格（`userId` = Telegram user ID）：
+每個 user 可以喺 `src/ai/skills/users/{userId}/SKILL.md` 放專屬人格（`userId` = Telegram user ID）：
 
 ```
-src/ai/skills/users/123456789.md
+src/ai/skills/users/123456789/SKILL.md
 ```
 
 - 存在就會同 base skill **合併**做 system prompt
-- 唔存在就淨係用 base skill
+- 唔存在就淨係用 base skill（bot 會自動建立空檔案）
 - 呢啲檔案係 gitignored
 
-**Bot 可以自己更新** — `base.md` 教咗 AI：想改變對某 user 嘅人格時，喺回覆最尾加 `[user_skill]: <新人格>`，bot 會自動寫入 `users/{userId}.md` 並由回覆中剝走 marker。
+**Bot 可以自己更新** — `base/SKILL.md` 教咗 AI：想改變對某 user 嘅人格時，喺回覆最尾加 `[user_skill]: <新人格>`，bot 會自動寫入 `users/{userId}/SKILL.md`（自動包 frontmatter）並由回覆中剝走 marker。
 
 ## VPN（Surfshark OpenVPN）
 
