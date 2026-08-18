@@ -9,7 +9,7 @@ src/ai/skills/utils/{name}/SKILL.md
 - 每個 `SKILL.md` 開頭有 YAML frontmatter（`name` + `description`），`name` 要同 folder 名一致（細楷 + 連字號）
 - 後面係 skill 內容（instructions）
 - loader 會剝走 frontmatter，用 frontmatter 嘅 `name`（fallback folder 名）做 `[skill: 名稱]` 標頭再合併
-- **呢啲 utils skills 照 commit**（唔 gitignore）；base / users 嘅真實 skill 先係 gitignored（可能有 persona / config）
+- **呢啲 utils skills 同 base skill 照 commit**（唔 gitignore）；淨係 `users/` 下嘅 per-user skill 先係 gitignored（可能有 persona / config）
 
 例如 `image/SKILL.md`：
 

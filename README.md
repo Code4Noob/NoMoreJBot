@@ -65,10 +65,9 @@ src/
 │   ├── skill.ts           # 載入 SKILL.md（Agent Skills 格式，按 AI_SKILL 切換）
 │   ├── logger.ts          # 統一 AI response logging
 │   ├── tools.ts           # 共用 tool list + functionHandlers
-│   ├── skills/            # Agent Skills（base / users gitignored，utils 照 commit）
+│   ├── skills/            # Agent Skills（淨係 users 下嘅 skill gitignored，base / utils 照 commit）
 │   │   ├── base/
 │   │   │   └── SKILL.md   # base persona（按 AI_SKILL 切換，可多個）
-│   │   ├── base.md.example
 │   │   ├── users/
 │   │   │   └── {userId}/SKILL.md   # per-user 人格（gitignored）
 │   │   └── utils/
@@ -118,8 +117,7 @@ AI_SKILL=base    # 預設
 AI_SKILL=admin
 ```
 
-- 真實 `base/SKILL.md` 係 gitignored（可能含 persona / config）
-- 參考 `base.md.example` 整新 skillset
+- `base/SKILL.md` 照 commit，可以做新 skillset 嘅起點範本（複製做 `admin/SKILL.md` 再改）
 
 ### Utility skills（工具指示）
 
