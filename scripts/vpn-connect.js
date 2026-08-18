@@ -6,7 +6,6 @@
  *   1. spawn 系統 openvpn binary（--config + management interface）
  *   2. 用 node-openvpn library 監察連接狀態
  *   3. 連接成功後攞 tunnel IP，設定 policy routing（ip rule）
- *   4. 自動寫入 .env 嘅 VPN_TUNNEL_IP
  *
  * 注意：仍需系統安裝 openvpn 同 root 權限（tun 裝置 + ip rule）
  * 用法：sudo node scripts/vpn-connect.js
@@ -18,26 +17,11 @@ const openvpnmanager = require("node-openvpn");
 
 const CONFIG = path.resolve("vpn/surfshark-sg.ovpn");
 const VPN_DIR = path.resolve("vpn");
-const ENV_FILE = path.resolve(".env");
 const MGMT_PORT = 7505;
 const ROUTE_TABLE = 100;
 const LOG_FILE = path.resolve("vpn/openvpn.log");
 
-// ---------- .env 更新 ----------
-function setEnvVar(envPath, key, value) {
-    let content = "";
-    if (fs.existsSync(envPath)) content = fs.readFileSync(envPath, "utf-8");
-    const regex = new RegExp(`^#?\\s*${key}=.*$`, "m");
-    const line = `${key}=${value}`;
-    if (regex.test(content)) {
-        content = content.replace(regex, line);
-    } else {
-        content += `\n${line}\n`;
-    }
-    fs.writeFileSync(envPath, content, "utf-8");
-}
-
-// ---------- policy routing + 寫 env ----------
+// ---------- policy routing ----------
 function finalize() {
     try {
         const link = execSync("ip -o link show | grep -oE 'tun[0-9]+' | head -1", { encoding: "utf-8" }).trim();
@@ -76,8 +60,6 @@ function finalize() {
         execSync(`ip route add default via ${gw} dev ${link} table ${ROUTE_TABLE}`);
         execSync(`ip rule add from ${tunNet} lookup ${ROUTE_TABLE}`);
 
-        setEnvVar(ENV_FILE, "VPN_TUNNEL_IP", tunIP);
-        console.log(`📝 已寫入 .env: VPN_TUNNEL_IP=${tunIP}`);
         console.log("🔍 測試: curl --interface " + tunIP + " https://api.ipify.org");
         process.exit(0);
     } catch (err) {
