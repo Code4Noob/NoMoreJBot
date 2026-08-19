@@ -35,8 +35,10 @@ async function loadPendingReminders(bot: Telegraf): Promise<void> {
 }
 
 function scheduleReminder(bot: Telegraf, reminder: any): void {
-    const delay = new Date(reminder.remindAt).getTime() - Date.now();
-    if (delay <= 0) return;
+    const delay = Math.max(
+        new Date(reminder.remindAt).getTime() - Date.now(),
+        0
+    );
     const key = String(reminder._id);
     if (timers.has(key)) clearTimeout(timers.get(key));
     const timer = setTimeout(async () => {
@@ -165,9 +167,7 @@ function registerReminderWizard(bot: Telegraf): void {
             });
             return;
         }
-        const remindAt = parseHk(
-            `${d.date} ${pad(d.hour)}:${pad(d.minute)}`
-        );
+        const remindAt = parseHk(`${d.date} ${pad(d.hour)}:${pad(d.minute)}`);
         const reminder = await Reminder.create({
             userId,
             chatId: d.chatId,
@@ -261,9 +261,7 @@ async function showMinutePicker(ctx: any): Promise<void> {
 async function showConfirm(ctx: any): Promise<void> {
     const d = pending.get(ctx.from.id);
     if (!d) return;
-    const remindAt = parseHk(
-        `${d.date} ${pad(d.hour!)}:${pad(d.minute!)}`
-    );
+    const remindAt = parseHk(`${d.date} ${pad(d.hour!)}:${pad(d.minute!)}`);
     await render(
         ctx,
         `📋 確認提醒：\n📝 ${d.text}\n⏰ ${remindAt.format("YYYY-MM-DD HH:mm")}`,
