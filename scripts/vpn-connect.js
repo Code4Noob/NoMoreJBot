@@ -95,6 +95,21 @@ function finalize() {
         execSync(`ip rule add from ${tunNet} lookup ${ROUTE_TABLE}`);
         addDestRules();
 
+        // 起 detached route-watch daemon：openvpn 重連時 tun0 會 down/up，
+        // kernel 會刪走 table 100 default route，由 daemon 自動補返。
+        try {
+            const watcher = spawn(process.execPath, [
+                path.resolve("scripts/vpn-route-watch.js"),
+            ], {
+                detached: true,
+                stdio: "ignore",
+            });
+            watcher.unref();
+            console.log("🛡️ route-watch daemon 已啟動");
+        } catch (err) {
+            console.log("⚠️ route-watch daemon 啟動失敗:", err?.message || err);
+        }
+
         console.log("🔍 測試: curl --interface " + tunIP + " https://api.ipify.org");
         process.exit(0);
     } catch (err) {

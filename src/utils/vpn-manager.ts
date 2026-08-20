@@ -14,7 +14,7 @@
  *   - 設咗 SUDO_PASSWORD（.env）-> 非互動重啟（sudo -S 由 stdin 餵密碼）
  *   - 冇設 SUDO_PASSWORD -> stdio inherit 喺 terminal 互動問；唔係 terminal 就提示手動起
  */
-import { spawn } from "child_process";
+import { execSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { detectTunnelIP } from "./vpn";
@@ -49,6 +49,20 @@ function findRepoRoot(): string {
 
 export function isTunnelUp(): boolean {
     return !!detectTunnelIP();
+}
+
+/**
+ * table 100 有冇 default route（openvpn 重連後 kernel 會刪走，但 tunnel 仲 up）。
+ * 冇嘅話就算 isTunnelUp() true 都唔算「健康」——流量會跌返 main table 出街。
+ */
+function routeTableHealthy(): boolean {
+    try {
+        return /default/.test(
+            execSync("ip route show table 100", { encoding: "utf-8" }).toString()
+        );
+    } catch {
+        return false;
+    }
 }
 
 function runVPNConnect(): Promise<void> {
@@ -116,7 +130,7 @@ async function waitForTunnel(): Promise<void> {
  * 失敗會 cooldown，避免不斷重試。
  */
 export async function ensureVPN(): Promise<void> {
-    if (isTunnelUp()) return;
+    if (isTunnelUp() && routeTableHealthy()) return;
     return startVPN();
 }
 
