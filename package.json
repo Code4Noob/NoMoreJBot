@@ -8,7 +8,8 @@
     "dev": "bun run --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target node --external playwright --external playwright-core --external node-fetch --external undici",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "bun scripts/patch-telegraf.js"
   },
   "keywords": [],
   "author": "",
