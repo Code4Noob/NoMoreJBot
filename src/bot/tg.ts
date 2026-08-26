@@ -33,7 +33,12 @@ const fs = require("fs");
 const path = require("path");
 import axios from "axios";
 
-const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string);
+// telegraf 預設 handlerTimeout = 90s：AI + 多 round tool loop 成日唔夠時間就俾佢硬 cut
+//（TimeoutError: Promise timed out after 90000 ms，個 update 死咗但 bot 冇回覆 → 似「卡住」）。
+// 提高上限做 safety net（真正兜底喺 handleAIRequest 內部嘅 REQUEST_DEADLINE_MS）。
+const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string, {
+    handlerTimeout: Number(process.env.HANDLER_TIMEOUT_MS) || 300_000,
+});
 
 // 啟動時為舊 sticker cache entry 補返 fileId（俾 get_cached_stickers 用到）
 backfillStickerCache(bot.telegram).catch((err) =>
@@ -426,6 +431,11 @@ async function handleAIRequest(
         const MAX_TOOL_ROUNDS = 5;
         const MAX_TOKENS_PER_QUESTION =
             Number(process.env.MAX_TOKENS_PER_QUESTION) || 10000000;
+        // 成個 AI request 嘅硬 deadline：超過就唔好再 call 工具，直接迫 LLM 俾結論。
+        // 一定要低過 telegraf 嘅 handlerTimeout，確保 bot 一定答到嘢而唔係俾人硬 cut（見上面 Telegraf 註）。
+        const REQUEST_DEADLINE_MS =
+            Number(process.env.REQUEST_DEADLINE_MS) || 55_000;
+        const REQUEST_START = Date.now();
         // 將剩餘 tool call 次數話俾 LLM 知，等佢接近 limit 就自己收手俾結論
         const buildSystemPrompt = (roundsLeft: number) => {
             const note =
@@ -451,7 +461,8 @@ async function handleAIRequest(
         );
 
         if (toolCalls && callsGreetingTool) {
-            await sendSectioned(ctx, reply || "正在處理你的需求");
+            // 出返個即時 feedback，等 user 知道 bot 喺度做緊嘢（唔會好似「卡住」咁）
+            await sendSectioned(ctx, reply || "🔍 處理緊你嘅需求，請稍候…");
         }
 
         // Handle model function calls in a loop (Gemini may make multiple calls)
@@ -460,7 +471,8 @@ async function handleAIRequest(
         while (
             toolCalls &&
             toolRoundsLeft > 0 &&
-            currentTokenUsage < MAX_TOKENS_PER_QUESTION
+            currentTokenUsage < MAX_TOKENS_PER_QUESTION &&
+            Date.now() - REQUEST_START < REQUEST_DEADLINE_MS
         ) {
             toolRoundsLeft--;
             contextMessages.push({
@@ -505,6 +517,26 @@ async function handleAIRequest(
             usage += generalResponse.usage;
             currentTokenUsage += generalResponse.usage;
             toolCalls = generalResponse.toolCalls;
+        }
+
+        // 如果係因為超時（時間用盡）跳出 loop 而仲有 tool call 未處理 → 強制要 final answer，
+        // 唔好無止境咁搜落去。buildSystemPrompt(0) 會叫佢直接根據現有資料俾答案、唔准再 call 工具。
+        if (toolCalls && Date.now() - REQUEST_START >= REQUEST_DEADLINE_MS) {
+            console.log("⏰ tool loop 超過 deadline，強制 final answer（唔再 call 工具）");
+            try {
+                const forced = await getAIResponse({
+                    messages: contextMessages,
+                    systemPrompt: buildSystemPrompt(0),
+                });
+                if (forced.message) reply = forced.message;
+                usage += forced.usage;
+            } catch (forceErr: any) {
+                console.log(
+                    "⚠️ 強制 final answer 失敗:",
+                    forceErr?.message || forceErr
+                );
+            }
+            toolCalls = undefined;
         }
 
         // Fallback if message is still null after all tool rounds
