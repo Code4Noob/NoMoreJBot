@@ -498,7 +498,20 @@ async function handleAIRequest(
                         });
                         return;
                     }
-                    const functionResult = await handler(JSON.parse(args));
+                    // 防禦：任何 handler 拋錯（包括 JSON.parse(args) 出錯）都變成 tool error result，
+                    // 唔可以俾個 rejection 彈出 Promise.all（會 kill 成個 round，甚至變 unhandled rejection）
+                    let functionResult: any;
+                    try {
+                        functionResult = await handler(JSON.parse(args));
+                    } catch (toolErr: any) {
+                        console.log(
+                            `⚠️ tool 執行失敗: ${name}`,
+                            toolErr?.message || toolErr
+                        );
+                        functionResult = {
+                            error: `Tool ${name} 執行失敗: ${toolErr?.message || "未知錯誤"}`,
+                        };
+                    }
                     contextMessages.push({
                         name,
                         role: "tool",

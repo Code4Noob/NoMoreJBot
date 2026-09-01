@@ -7,18 +7,42 @@
  * 註：呢個 crawler 用 Chromium 自身網絡（唔行 VPN tunnel），
  *     VPN 主要係畀 Gemini API 用，一般網頁直連就得。
  */
-import { chromium, type Browser } from "playwright";
+import {
+    chromium,
+    type Browser,
+    type BrowserContext,
+    type Page,
+} from "playwright";
 
-// 共用一個 browser instance（lazy），唔使每次 search/crawl 都重新 launch（慳時間 + 慳 memory）
+// 共用一個 browser instance（lazy），唔使每次 search/crawl 都重新 launch（慳時間 + 慳 memory）。
+// 用單一 promise guard：並發 request 同時 call 都只會 launch 一次，唔會開多個 browser（leak）。
 let sharedBrowser: Browser | null = null;
+let sharedBrowserPromise: Promise<Browser> | null = null;
 async function getSharedBrowser(): Promise<Browser> {
-    if (!sharedBrowser || !sharedBrowser.isConnected()) {
-        sharedBrowser = await chromium.launch({
-            headless: true,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        });
+    if (sharedBrowser && sharedBrowser.isConnected()) return sharedBrowser;
+    // 舊 browser 死咗 / 未起 → 清走 reference 再重新 launch
+    if (sharedBrowser) {
+        sharedBrowser = null;
+        sharedBrowserPromise = null;
     }
-    return sharedBrowser;
+    if (!sharedBrowserPromise) {
+        sharedBrowserPromise = chromium
+            .launch({
+                headless: true,
+                args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            })
+            .then((b) => {
+                sharedBrowser = b;
+                return b;
+            })
+            .catch((err) => {
+                // launch 失敗就 reset，下次再試
+                sharedBrowserPromise = null;
+                sharedBrowser = null;
+                throw err;
+            });
+    }
+    return sharedBrowserPromise;
 }
 
 /** 硬 timeout：就算網頁 load 唔完 / browser hang 都唔會卡死個 AI request（原 promise 繼續跑但唔會變 unhandled rejection） */
@@ -45,21 +69,22 @@ export interface CrawlResult {
 const MAX_TEXT = 12000;
 
 export async function crawlUrlToText(url: string): Promise<CrawlResult> {
-    const browser = await getSharedBrowser();
-    const page = await browser.newPage();
+    let page: Page | null = null;
     try {
+        const browser = await getSharedBrowser();
+        page = await browser.newPage();
         return await withHardTimeout(
             (async () => {
-                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+                await page!.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
                 try {
-                    await page.waitForLoadState("networkidle", { timeout: 5000 });
+                    await page!.waitForLoadState("networkidle", { timeout: 5000 });
                 } catch (_) {
                     /* 等唔到 network idle 就算，用 domcontentloaded 後嘅內容 */
                 }
 
-                const title = await page.title();
+                const title = await page!.title();
                 // 優先攞 article / main 正文，冇就成個 body
-                const text = await page.evaluate(() => {
+                const text = await page!.evaluate(() => {
                     const root =
                         document.querySelector("article, main, [role='main']") ||
                         document.body;
@@ -75,7 +100,7 @@ export async function crawlUrlToText(url: string): Promise<CrawlResult> {
             35_000
         );
     } finally {
-        await page.close().catch(() => {});
+        if (page) await page.close().catch(() => {});
     }
 }
 
@@ -207,10 +232,14 @@ async function searchWebRss(query: string): Promise<SearchResult[]> {
 
 /** Fallback：Playwright 渲染 Bing（RSS 出唔到結果 / 出錯先用），有硬 timeout 兜底 */
 async function searchWebPlaywright(query: string): Promise<SearchResult[]> {
-    const browser = await getSharedBrowser();
-    const context = await browser.newContext({ userAgent: SEARCH_UA, locale: "zh-HK" });
-    const page = await context.newPage();
+    let context: BrowserContext | null = null;
     try {
+        const browser = await getSharedBrowser();
+        context = await browser.newContext({
+            userAgent: SEARCH_UA,
+            locale: "zh-HK",
+        });
+        const page = await context.newPage();
         return await withHardTimeout(
             (async () => {
                 const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&mkt=zh-HK`;
@@ -243,7 +272,7 @@ async function searchWebPlaywright(query: string): Promise<SearchResult[]> {
             25_000
         );
     } finally {
-        await context.close().catch(() => {});
+        if (context) await context.close().catch(() => {});
     }
 }
 
