@@ -2,7 +2,7 @@ import { Context, Input, Markup, Telegraf } from "telegraf";
 import { User } from "../models/user";
 import { Chat } from "../models/chat";
 import { dbHealthCheck } from "../db";
-import { from, validateJCount } from "../tools/date";
+import { from, validateConsecutiveDay, validateJCount } from "../tools/date";
 
 import { v4 as uuidv4 } from "uuid";
 import hkdayjs from "../utils/dayjs";
@@ -754,9 +754,14 @@ bot.action(/^updateDay:(\d+)$/, async (ctx: any) => {
         // "chat.id": chatId,
     });
     if (!user) user = await initUser(ctx);
+    user.day = user.day || 0;
+    user.day_updated_at = user.day_updated_at || new Date();
     if (validateJCount(user.day_updated_at)) {
-        user.day = user.day + 1;
-        user.day_updated_at = hkdayjs();
+        user.day = validateConsecutiveDay(user.day_updated_at)
+            ? (user.day || 0) + 1
+            : 1;
+
+        user.day_updated_at = hkdayjs().toDate();
         user.save();
         await ctx.reply(
             `${user.first_name} | Day${user.day}`,

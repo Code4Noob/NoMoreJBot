@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY package.json bun.lock ./
+
+COPY scripts ./scripts
+
 RUN bun install --frozen-lockfile
 
 COPY . .
