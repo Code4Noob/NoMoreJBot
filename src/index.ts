@@ -1,9 +1,13 @@
 // Bun 會自動 load .env，唔使 dotenv
 import bot from './bot/tg';
+import { startSlack } from './bot/slack';
 import { dbConnect } from "./db";
 import { reloadMarkSixReminders } from "./scheduler/marksix";
 import { loadPendingReminders } from "./reminder/reminder";
 import { registerBotCommands } from "./bot/commands";
+
+// Slack app instance（SIGINT 時 stop 用）
+let slackApp: any = null;
 
 // 長跑 bot 唔可以俾任何 stray rejection / exception 打死（例如 Playwright timeout DOMException）。
 // 攔截咗淨係 log，唔好 crash——最壞情況都係嗰個 request 失敗，唔係成個 bot 死。
@@ -33,6 +37,10 @@ async function main() {
     startBot();
     // 自動註冊 bot commands（setMyCommands，唔使 BotFather）
     registerBotCommands(bot);
+    // Slack（有 env 先行；冇就 skip）
+    startSlack().then((app) => {
+        slackApp = app;
+    });
 }
 
 // bot.launch() 會喺 polling 死咗（網絡錯誤等）時 reject。
@@ -52,5 +60,11 @@ async function startBot() {
 
 main();
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+process.once("SIGINT", () => {
+    bot.stop("SIGINT");
+    slackApp?.stop();
+});
+process.once("SIGTERM", () => {
+    bot.stop("SIGTERM");
+    slackApp?.stop();
+});

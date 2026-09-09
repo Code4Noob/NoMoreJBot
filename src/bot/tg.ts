@@ -18,12 +18,8 @@ import {
     resolveStickerId,
 } from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
-import {
-    getAIResponse,
-    getGeminiImage,
-    functionHandlers,
-    toolsConfig,
-} from "../ai";
+import { getGeminiImage } from "../ai";
+import { runAIRoundTrip } from "../ai/engine";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 import {
     registerReminderWizard,
@@ -435,7 +431,6 @@ async function handleAIRequest(
         // 一定要低過 telegraf 嘅 handlerTimeout，確保 bot 一定答到嘢而唔係俾人硬 cut（見上面 Telegraf 註）。
         const REQUEST_DEADLINE_MS =
             Number(process.env.REQUEST_DEADLINE_MS) || 55_000;
-        const REQUEST_START = Date.now();
         // 將剩餘 tool call 次數話俾 LLM 知，等佢接近 limit 就自己收手俾結論
         const buildSystemPrompt = (roundsLeft: number) => {
             const note =
@@ -445,112 +440,21 @@ async function handleAIRequest(
             return `${getSystemPrompt(ctx.from?.id)}\n\n[系統提示] ${note}`;
         };
 
-        let {
-            message: reply,
-            usage,
-            toolCalls,
-        } = await getAIResponse({
-            messages: chatContext.slice(-6),
+        // 用共用 AI engine（tg / slack 同一套邏輯）：初 call + tool loop + deadline 強制收尾
+        const { reply: engineReply, usage } = await runAIRoundTrip({
+            initialMessages: chatContext.slice(-6),
+            contextMessages,
             systemPrompt: buildSystemPrompt(MAX_TOOL_ROUNDS),
+            buildSystemPrompt,
+            maxRounds: MAX_TOOL_ROUNDS,
+            deadlineMs: REQUEST_DEADLINE_MS,
+            maxTokens: MAX_TOKENS_PER_QUESTION,
+            onGreeting: async (t) => {
+                // call 緊 tool（web_search / 巴士）→ 出返個 feedback，等 user 知 bot 做緊嘢
+                await sendSectioned(ctx, t || "🔍 處理緊你嘅需求，請稍候…");
+            },
         });
-
-        // call tool 時會唔會出「正在處理你的需求」greeting
-        //（per tool 開關喺 src/ai/tools.ts 嘅 toolsConfig.showGreeting[toolName]）
-        const callsGreetingTool = toolCalls?.some(
-            (tc: any) => toolsConfig.showGreeting[tc.function?.name]
-        );
-
-        if (toolCalls && callsGreetingTool) {
-            // 出返個即時 feedback，等 user 知道 bot 喺度做緊嘢（唔會好似「卡住」咁）
-            await sendSectioned(ctx, reply || "🔍 處理緊你嘅需求，請稍候…");
-        }
-
-        // Handle model function calls in a loop (Gemini may make multiple calls)
-        let toolRoundsLeft = MAX_TOOL_ROUNDS;
-        let currentTokenUsage = usage; // 由初次 call 開始累計
-        while (
-            toolCalls &&
-            toolRoundsLeft > 0 &&
-            currentTokenUsage < MAX_TOKENS_PER_QUESTION &&
-            Date.now() - REQUEST_START < REQUEST_DEADLINE_MS
-        ) {
-            toolRoundsLeft--;
-            contextMessages.push({
-                role: "assistant",
-                content: null,
-                tool_calls: toolCalls,
-            });
-            await Promise.all(
-                toolCalls.map(async (toolCall) => {
-                    const { name, arguments: args } = toolCall.function;
-                    const handler = functionHandlers[name];
-                    if (typeof handler !== "function") {
-                        console.log(
-                            `⚠️ 未知 tool: ${name}（model 幻覺，唔存在）`
-                        );
-                        contextMessages.push({
-                            name,
-                            role: "tool",
-                            content: JSON.stringify({
-                                error: `Tool "${name}" does not exist. Only use the tools provided in the tools list.`,
-                            }),
-                            tool_call_id: toolCall.id,
-                        });
-                        return;
-                    }
-                    // 防禦：任何 handler 拋錯（包括 JSON.parse(args) 出錯）都變成 tool error result，
-                    // 唔可以俾個 rejection 彈出 Promise.all（會 kill 成個 round，甚至變 unhandled rejection）
-                    let functionResult: any;
-                    try {
-                        functionResult = await handler(JSON.parse(args));
-                    } catch (toolErr: any) {
-                        console.log(
-                            `⚠️ tool 執行失敗: ${name}`,
-                            toolErr?.message || toolErr
-                        );
-                        functionResult = {
-                            error: `Tool ${name} 執行失敗: ${toolErr?.message || "未知錯誤"}`,
-                        };
-                    }
-                    contextMessages.push({
-                        name,
-                        role: "tool",
-                        content: JSON.stringify(functionResult),
-                        tool_call_id: toolCall.id,
-                    });
-                })
-            );
-            const generalResponse = await getAIResponse({
-                messages: contextMessages,
-                systemPrompt: buildSystemPrompt(toolRoundsLeft),
-            });
-            if (generalResponse.message) {
-                reply = generalResponse.message;
-            }
-            usage += generalResponse.usage;
-            currentTokenUsage += generalResponse.usage;
-            toolCalls = generalResponse.toolCalls;
-        }
-
-        // 如果係因為超時（時間用盡）跳出 loop 而仲有 tool call 未處理 → 強制要 final answer，
-        // 唔好無止境咁搜落去。buildSystemPrompt(0) 會叫佢直接根據現有資料俾答案、唔准再 call 工具。
-        if (toolCalls && Date.now() - REQUEST_START >= REQUEST_DEADLINE_MS) {
-            console.log("⏰ tool loop 超過 deadline，強制 final answer（唔再 call 工具）");
-            try {
-                const forced = await getAIResponse({
-                    messages: contextMessages,
-                    systemPrompt: buildSystemPrompt(0),
-                });
-                if (forced.message) reply = forced.message;
-                usage += forced.usage;
-            } catch (forceErr: any) {
-                console.log(
-                    "⚠️ 強制 final answer 失敗:",
-                    forceErr?.message || forceErr
-                );
-            }
-            toolCalls = undefined;
-        }
+        let reply = engineReply;
 
         // Fallback if message is still null after all tool rounds
         if (!reply) reply = "冇嘢想講";

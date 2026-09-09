@@ -6,15 +6,16 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outdir ./dist --target node --external playwright --external playwright-core --external node-fetch --external undici",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --external playwright --external playwright-core --external node-fetch --external undici --external @slack/bolt",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "postinstall": "bun scripts/patch-telegraf.js"
+    "postinstall": "bun scripts/patch-telegraf.js && bun scripts/patch-slack.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@slack/bolt": "^4.7.3",
     "axios": "1.2.0-alpha.1",
     "dayjs": "^1.11.13",
     "mongoose": "^6.13.8",

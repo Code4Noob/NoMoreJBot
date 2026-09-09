@@ -1,6 +1,8 @@
 # NoMoreJBot
 
-Telegram bot（Telegraf）整合多個 AI model，支援圖片生成 / 圖片辨識、天氣、六合彩、聊天歷史、以及可切換嘅 AI skillset。
+Telegram bot（Telegraf）+ 可選嘅 **Slack bot**（@slack/bolt + Socket Mode）整合多個 AI model，支援圖片生成 / 圖片辨識、天氣、六合彩、聊天歷史、以及可切換嘅 AI skillset。
+
+兩個 platform 共用同一套 AI engine（`src/ai/engine.ts`）、tools、skills 同人格；Slack 嘅 day counter / marksix config / reminder 存喺獨立嘅 `chat/slack-state.json`，唔掂 Telegram 嘅 Mongo data。
 
 ## 功能
 
@@ -35,6 +37,33 @@ bun run build
 bun run start
 ```
 
+## Slack（可選）
+
+填咗 `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` 之後，bot 會同時行 Telegram + Slack（Socket Mode，唔使 public URL / webhook）。
+
+Slack 支援嘅功能：
+
+- **AI 對話** — channel 度 `@bot`，或者 DM bot，即可對話（含 tool calling / 網上搜尋）；channel 回覆方式由 `SLACK_REPLY_IN_THREAD` 控制（預設直接出 channel，設 `true` 就開 thread）
+- **圖片辨識 / 編輯** — DM / @bot 嗰陣附圖即分析；AI 回覆 `gen image edit` 會用你張相執圖
+- **圖片生成** — `gen image <描述>` 自動生圖；`/draw <描述>` 直接畫
+- **Slash commands** — `/help` `/j` `/me` `/users` `/from` `/weather` `/marksix` `/marksix_remind` `/jp` `/transportation` `/reminder` `/quit`
+- **Day 追蹤** — `/j`（+1 / reset 按鈕）、`/me`、`/users` leaderboard
+- **馬會提醒** — `/marksix_remind` 喺個 channel 開/關，到時 cron 自動推
+- **Reminder 精靈** — `/reminder [內容]` 開 modal 揀日期時間
+
+### 設定步驟
+
+1. 喺 [api.slack.com/apps](https://api.slack.com/apps) 開一個 app，揀 **From an app manifest** 或者手動建
+2. 開 **Socket Mode**，起一個 App-Level Token（scope `connections:write`）→ `SLACK_APP_TOKEN`（`xapp-...`）
+3. 加 Bot Token Scopes（`OAuth & Permissions`）：
+   `app_mentions:read`、`channels:history`、`channels:read`、`chat:write`、`commands`、`files:write`、`groups:history`、`groups:read`、`im:history`、`im:read`、`im:write`、`users:read`、`reactions:write`
+4. 裝入 workspace，攞 Bot Token（`xoxb-...`）→ `SLACK_BOT_TOKEN`
+5. 加 Slash Commands（`/help` `/j` `/me` `/users` `/from` `/weather` `/marksix` `/marksix_remind` `/jp` `/transportation` `/draw` `/reminder` `/quit`）
+6. Event Subscriptions 訂閱：`app_mention`、`message.channels`、`message.im`
+7. `.env` 填好兩條 token（+ 可選 `SLACK_ADMIN_IDS`），重啟 bot
+
+> 貼圖（Telegram `[sticker]`）喺 Slack 冇對應功能，AI 回覆入面嘅 `[sticker]` marker 會自動剝走淨係出文字。
+
 ## 環境變數（.env）
 
 | Var | 用途 | 預設 |
@@ -55,6 +84,10 @@ bun run start
 | `MAX_HISTORY_LINES` | 歷史檔案最大行數（超過刪舊） | `200` |
 | `MONGOURL` | MongoDB connection string | 必填 |
 | `DB_NAME` | MongoDB database name | - |
+| `SLACK_BOT_TOKEN` | Slack bot token（`xoxb-...`）— 有先會啟動 Slack | 可選 |
+| `SLACK_APP_TOKEN` | Slack app-level token（`xapp-...`，Socket Mode） | 可選 |
+| `SLACK_ADMIN_IDS` | Slack admin user ids（逗號分隔）— `/quit` 用 | 可選 |
+| `SLACK_REPLY_IN_THREAD` | Slack 回覆方式：`true` = 開 thread；`false` = 直接出 channel | `false` |
 
 ## 架構
 
@@ -62,6 +95,7 @@ bun run start
 src/
 ├── ai/                    # AI abstraction（provider 無關）
 │   ├── index.ts           # Dispatcher：getAIResponse() 按 AI_PROVIDER 揀 model
+│   ├── engine.ts          # 共用 AI 對話 engine（tool loop + reply markers）— tg / slack 共用
 │   ├── types.ts           # 共用 AI 型別
 │   ├── skill.ts           # 載入 SKILL.md（Agent Skills 格式，按 AI_SKILL 切換）
 │   ├── logger.ts          # 統一 AI response logging
@@ -78,7 +112,10 @@ src/
 │       ├── deepseek.ts
 │       └── gpt.ts
 ├── bot/
-│   └── tg.ts              # Telegram bot handlers
+│   ├── tg.ts              # Telegram bot handlers（用共用 engine）
+│   ├── commands.ts        # Telegram bot commands 註冊（setMyCommands）
+│   ├── slack.ts           # Slack bot（@slack/bolt + Socket Mode，全部功能）
+│   └── slack-store.ts     # Slack 專用 state（chat/slack-state.json）
 ├── models/                # MongoDB models
 ├── tools/                 # 工具函數（weather / marksix / date）
 ├── utils/

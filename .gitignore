@@ -13,10 +13,10 @@ log/
 
 chat/history/*
 chat/sticker-cache.json
+chat/slack-state.json
 
 vpn/*
 
-# AI skill - 只 hide users/ 下嘅 per-user skill（可能有 persona / config）；base / utils 照 commit
-src/ai/skills/users/[0-9]*/
-src/ai/skills/users/[0-9]*.md
+# AI skill - users/ 下嘅 per-user skill 全部 ignore（Telegram numeric + Slack U…/W… id 都有；可能有 persona / config），淨係留 README
+src/ai/skills/users/*
 !src/ai/skills/users/README.md
