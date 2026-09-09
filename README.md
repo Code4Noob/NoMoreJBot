@@ -77,6 +77,7 @@ Slack 支援嘅功能：
 | `GEMINI_IMAGE_MODEL` | Gemini 生圖 model | `gemini-3.1-flash-lite-image` |
 | `DEEPSEEK_API_KEY` | DeepSeek V4 | - |
 | `DEEPSEEK_MODEL` | DeepSeek model | `deepseek-chat` |
+| `DEEPSEEK_VISION_MODEL` | DeepSeek vision model（有圖自動轉用） | `deepseek-v4-flash-vision-exp` |
 | `DEEPSEEK_BASE_URL` | DeepSeek API base | `https://api.deepseek.com` |
 | `AZURE_OPENAI_URL` | GPT（Azure OpenAI）endpoint | - |
 | `AZURE_OPENAI_KEY` | GPT API key | - |

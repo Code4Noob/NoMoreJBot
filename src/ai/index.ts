@@ -43,9 +43,11 @@ export { functionHandlers, toolList, toolsConfig };
 export { getGeminiImage };
 
 /**
- * 統一生圖入口（provider-aware）：
- * - AI_PROVIDER=glm -> 用 GLM 自己嘅 CogView（唔使 Gemini key）
- * - 其他（gemini / deepseek / gpt）照用返 Gemini 生圖
+ * 統一生圖入口（provider-aware + fallback chain）：
+ * - AI_PROVIDER=glm    -> GLM CogView（唔使 Gemini key）
+ * - AI_PROVIDER=gemini -> Gemini
+ * - deepseek / gpt 冇自家生圖 -> 先試 Gemini，唔得（401 / 冇 key…）自動 fallback 用 GLM CogView
+ * 淨係要有其中一個 image provider 嘅 key 就出到圖。
  */
 export async function generateImage(opts: {
     prompt: string;
@@ -54,7 +56,34 @@ export async function generateImage(opts: {
     text: string | null;
     imageData: { mimeType: string; data: string } | null;
 }> {
-    if (activeProvider === "glm") return getGlmImage(opts);
-    return getGeminiImage(opts);
+    // 生圖 provider 優先次序
+    const chain: string[] = [];
+    if (activeProvider === "glm") chain.push("glm");
+    if (activeProvider === "gemini") chain.push("gemini");
+    if (activeProvider === "deepseek" || activeProvider === "gpt") {
+        // 有 GLM key 就用 GLM CogView 做主力（唔使撞 invalid Gemini key），Gemini 做後備
+        if (process.env.GLM_API_KEY) chain.push("glm", "gemini");
+        else chain.push("gemini", "glm");
+    }
+    // 兜底：邊個 key 有就補落 chain 尾
+    if (process.env.GLM_API_KEY && !chain.includes("glm")) chain.push("glm");
+    if (process.env.GEMINI_API_KEY && !chain.includes("gemini"))
+        chain.push("gemini");
+
+    const errors: string[] = [];
+    for (const p of chain) {
+        try {
+            return p === "glm"
+                ? await getGlmImage(opts)
+                : await getGeminiImage(opts);
+        } catch (err: any) {
+            const msg = err?.response?.data?.error?.message || err?.message;
+            errors.push(`${p}: ${msg}`);
+            console.log(`⚠️ generateImage ${p} 失敗，試下一個:`, msg);
+        }
+    }
+    throw new Error(
+        `生圖失敗（試過: ${errors.join(" | ") || "冇任何 image provider"}）`
+    );
 }
 export type { AIRequest, AIResponse, AIMessage } from "./types";
