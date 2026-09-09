@@ -501,7 +501,31 @@ export async function startSlack(): Promise<App | null> {
             `📩 Slack app_mention: user=${ev.user} channel=${ev.channel} ts=${ev.ts} text=${(ev.text || "").slice(0, 80)}`
         );
         try {
-            const imageData = await firstImageData(client, ev);
+            // ⚠️ Slack app_mention event 唔一定包 files —— 用 ts 攞返完整 message（入面先有 file 資訊）
+            let full: any = ev;
+            if (!ev.files?.length) {
+                try {
+                    if (ev.thread_ts) {
+                        const rep = await client.conversations.replies({
+                            channel: ev.channel,
+                            ts: ev.thread_ts,
+                            latest: ev.ts,
+                            limit: 1,
+                            inclusive: true,
+                        });
+                        full = rep?.messages?.[0] ?? ev;
+                    } else {
+                        const hist = await client.conversations.history({
+                            channel: ev.channel,
+                            latest: ev.ts,
+                            limit: 1,
+                            inclusive: true,
+                        });
+                        full = hist?.messages?.[0] ?? ev;
+                    }
+                } catch (_) {}
+            }
+            const imageData = await firstImageData(client, full);
             const text = stripMentions(ev.text || "");
             // 冇文字淨係 @ -> 有圖就「幫我睇下」
             await handleSlackMessageText(client, {

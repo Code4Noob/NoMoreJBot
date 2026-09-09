@@ -14,6 +14,9 @@ import type { AIRequest, AIResponse, AIMessage } from "../types";
  */
 const GLM_API_KEY = process.env.GLM_API_KEY as string;
 export const GLM_MODEL = process.env.GLM_MODEL || "glm-5.3-flash";
+// Vision model（睇圖用）——實測 glm-5.3-flash 接受 image input，其他 glm model 唔得（400 1210）
+export const GLM_VISION_MODEL =
+    process.env.GLM_VISION_MODEL || "glm-5.3-flash";
 const GLM_BASE_URL =
     process.env.GLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
 
@@ -35,11 +38,27 @@ export async function getGlmResponse({
         if (msg.name) m.name = msg.name;
         if (msg.tool_call_id) m.tool_call_id = msg.tool_call_id;
         if (msg.tool_calls) m.tool_calls = msg.tool_calls;
+        // Vision：有圖就轉 OpenAI multimodal content（data URL base64）
+        if (msg.imageData) {
+            m.content = [
+                {
+                    type: "image_url",
+                    image_url: {
+                        url: `data:${msg.imageData.mimeType};base64,${msg.imageData.data}`,
+                    },
+                },
+                { type: "text", text: msg.content ?? "" },
+            ];
+        }
         openAIMessages.push(m);
     }
 
+    // 有圖（vision）就用 vision model，冇圖用返普通 model
+    const hasImage = messages.some((m) => m.imageData);
+    const model = hasImage ? GLM_VISION_MODEL : GLM_MODEL;
+
     const requestBody: any = {
-        model: GLM_MODEL,
+        model,
         // 最低 reasoning effort（慳時間慳 token）——AI_REASONING_EFFORT 可改 low / medium / high
         reasoning_effort: process.env.AI_REASONING_EFFORT || "low",
         messages: openAIMessages,
@@ -71,7 +90,7 @@ export async function getGlmResponse({
 
         logAIResponse({
             provider: "glm",
-            model: GLM_MODEL,
+            model,
             finishReason: choice?.finish_reason,
             tokens: data.usage?.total_tokens ?? 0,
             toolCalls: toolCalls?.length ?? 0,

@@ -83,6 +83,7 @@ Slack 支援嘅功能：
 | `AZURE_OPENAI_KEY` | GPT API key | - |
 | `GLM_API_KEY` | GLM（智譜 Zhipu）API key | - |
 | `GLM_MODEL` | GLM model | `glm-5.3-flash` |
+| `GLM_VISION_MODEL` | GLM vision model（有圖自動轉用；得 glm-5.3-flash 接受 image input） | `glm-5.3-flash` |
 | `GLM_BASE_URL` | GLM API base | `https://open.bigmodel.cn/api/paas/v4` |
 | `GLM_IMAGE_MODEL` | GLM 生圖（CogView）model（`AI_PROVIDER=glm` 用） | `cogview-4-250304` |
 | `GLM_IMAGE_SIZE` | GLM 生圖尺寸 | `1024x1024` |
