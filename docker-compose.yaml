@@ -64,5 +64,13 @@ services:
     # 開機時確保 runtime 目錄存在（尤其係 mount chat/log 時要有 chat/history 子目錄）
     command: sh -c "mkdir -p chat/history log && exec bun run dev"
 
+  # Run a script with: docker compose run --rm script <script-name>
+  script:
+    extends:
+      service: app
+    container_name: nomorejbot-script
+    entrypoint: ["sh", "-c", "bun run scripts/$1", "--"]
+    command: []
+
 volumes:
   mongo-data:

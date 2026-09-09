@@ -10,6 +10,19 @@ const validateJCount = (date: Date, now: Date = new Date()) => {
     );
 };
 
+const validateConsecutiveDay = (date: Date) => {
+    if (date === null || date === undefined) return true;
+
+    const yesterday = new Date();
+    yesterday.setDate(new Date().getDate() - 1);
+
+    return (
+        date.getFullYear() === yesterday.getFullYear() &&
+        date.getMonth() === yesterday.getMonth() &&
+        date.getDate() === yesterday.getDate()
+    );
+};
+
 // 將常見輸入 normalize 做 DD-MM-YYYY：
 // - 斜線 / 點 分隔（7/10/2026、7.10.2026）
 // - 單數字日期 / 月份（7/10/2026 -> 07-10-2026）
@@ -63,4 +76,4 @@ const fromNow = (date: string): string => {
     return parseDate(date).fromNow();
 };
 
-export { from, validateJCount };
+export { from, validateJCount, validateConsecutiveDay };
