@@ -88,6 +88,7 @@ Slack 支援嘅功能：
 | `SLACK_APP_TOKEN` | Slack app-level token（`xapp-...`，Socket Mode） | 可選 |
 | `SLACK_ADMIN_IDS` | Slack admin user ids（逗號分隔）— `/quit` 用 | 可選 |
 | `SLACK_REPLY_IN_THREAD` | Slack 回覆方式：`true` = 開 thread；`false` = 直接出 channel | `false` |
+| `SLACK_COMMAND_VISIBLE` | Slack slash command 回覆顯示：`me` = Only visible to you；`channel` = 出晒成個 channel | `me` |
 
 ## 架構
 

@@ -47,6 +47,18 @@ const SLACK_ADMIN_IDS = (process.env.SLACK_ADMIN_IDS || "")
 const SLACK_REPLY_IN_THREAD = ["1", "true", "yes"].includes(
     (process.env.SLACK_REPLY_IN_THREAD || "").toLowerCase()
 );
+// Slack slash command 回覆顯示：SLACK_COMMAND_VISIBLE=me（預設）→ "Only visible to you"（ephemeral，淨係撳嗰個人見到）；
+// =channel → 出晒成個 channel（in_channel）
+const SLACK_CMD_IN_CHANNEL = [
+    "channel",
+    "in_channel",
+    "public",
+    "1",
+    "true",
+].includes((process.env.SLACK_COMMAND_VISIBLE || "me").toLowerCase());
+// 加落每個 slash command respond() 嘅 object，決定回覆顯示方式
+const cmdVis = () =>
+    SLACK_CMD_IN_CHANNEL ? { response_type: "in_channel" as const } : {};
 
 const HISTORY_DIR = path.resolve(process.cwd(), "chat/history");
 const MAX_HISTORY_LINES = parseInt(process.env.MAX_HISTORY_LINES || "200", 10);
@@ -575,7 +587,7 @@ export async function startSlack(): Promise<App | null> {
         } catch (e: any) {
             lines.push(`• DB: ⚠️ ${e?.message || "err"}`);
         }
-        await respond({ text: lines.join("\n") });
+        await respond({ text: lines.join("\n"), ...cmdVis() });
     });
 
     // ── /weather ──
@@ -583,9 +595,9 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         try {
             const message = await weather();
-            await respond({ text: message, response_type: "in_channel" });
+            await respond({ text: message, ...cmdVis() });
         } catch (err: any) {
-            await respond({ text: `天氣查唔到: ${err?.message || "未知錯誤"}` });
+            await respond({ text: `天氣查唔到: ${err?.message || "未知錯誤"}`, ...cmdVis() });
         }
     });
 
@@ -594,9 +606,9 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         try {
             const message = await markSixReminder();
-            await respond({ text: message, response_type: "in_channel" });
+            await respond({ text: message, ...cmdVis() });
         } catch (err: any) {
-            await respond({ text: `馬會查唔到: ${err?.message || "未知錯誤"}` });
+            await respond({ text: `馬會查唔到: ${err?.message || "未知錯誤"}`, ...cmdVis() });
         }
     });
 
@@ -605,10 +617,10 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const payload = (command.text || "").trim();
         if (!payload) {
-            await respond({ text: "用法：/from <日期>\n例如：/from 01-08-2026 或 /from 7 Oct" });
+            await respond({ text: "用法：/from <日期>\n例如：/from 01-08-2026 或 /from 7 Oct", ...cmdVis() });
             return;
         }
-        await respond({ text: from(payload) });
+        await respond({ text: from(payload), ...cmdVis() });
     });
 
     // ── /jp（JLPT vocab）──
@@ -620,9 +632,9 @@ export async function startSlack(): Promise<App | null> {
                 `https://jlpt-vocab-api.vercel.app/api/words/random?level=${level}`
             );
             const message = Object.entries(resp.data).map((x) => x.join(": ")).join("\n");
-            await respond({ text: message });
+            await respond({ text: message, ...cmdVis() });
         } catch (error: any) {
-            await respond({ text: `JP 查唔到: ${error?.response?.data?.error || error.message}` });
+            await respond({ text: `JP 查唔到: ${error?.response?.data?.error || error.message}`, ...cmdVis() });
         }
     });
 
@@ -631,10 +643,10 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const prompt = (command.text || "").trim();
         if (!prompt) {
-            await respond({ text: "畫咩撚嘢？俾個描述嚟先（例如 /draw 一隻柴犬戴太陽眼鏡）" });
+            await respond({ text: "畫咩撚嘢？俾個描述嚟先（例如 /draw 一隻柴犬戴太陽眼鏡）", ...cmdVis() });
             return;
         }
-        await respond({ text: "畫緊..." });
+        await respond({ text: "畫緊...", ...cmdVis() });
         try {
             const { text, imageData } = await getGeminiImage({ prompt });
             if (imageData) {
@@ -649,13 +661,13 @@ export async function startSlack(): Promise<App | null> {
                         initial_comment: text || undefined,
                     });
                 } catch (err: any) {
-                    await respond({ text: `畫到但上傳失敗: ${err?.message || "未知錯誤"}` });
+                    await respond({ text: `畫到但上傳失敗: ${err?.message || "未知錯誤"}`, ...cmdVis() });
                 }
             } else {
-                await respond({ text: text ? `${text}` : "畫唔到" });
+                await respond({ text: text ? `${text}` : "畫唔到", ...cmdVis() });
             }
         } catch (error: any) {
-            await respond({ text: `畫唔到: ${error?.response?.data?.error?.message || error.message}` });
+            await respond({ text: `畫唔到: ${error?.response?.data?.error?.message || error.message}`, ...cmdVis() });
         }
     });
 
@@ -664,11 +676,11 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const payload = (command.text || "").trim();
         if (!payload) {
-            await respond({ text: "想去邊？格式：/transportation <出發地>去<目的地>\n例如：/transportation 旺角去中環" });
+            await respond({ text: "想去邊？格式：/transportation <出發地>去<目的地>\n例如：/transportation 旺角去中環", ...cmdVis() });
             return;
         }
         // 行返共用 AI flow
-        await respond({ text: "🔍 搵緊路線..." });
+        await respond({ text: "🔍 搵緊路線...", ...cmdVis() });
         await handleSlackMessageText(app.client, {
             channelId: command.channel_id,
             userId: command.user_id,
@@ -683,6 +695,7 @@ export async function startSlack(): Promise<App | null> {
         const st = store.getUserState(userId);
         const day = st.day || 0;
         await respond({
+            ...cmdVis(),
             text: `${await getUserName(app.client, userId)} | Day${day} — Jed?`,
             blocks: [
                 {
@@ -761,7 +774,7 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const st = store.getUserState(command.user_id);
         const name = await getUserName(app.client, command.user_id);
-        await respond({ text: `${name} | Day${st.day || 0}` });
+        await respond({ text: `${name} | Day${st.day || 0}`, ...cmdVis() });
     });
 
     // ── /users（leaderboard）──
@@ -769,7 +782,7 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const users = Object.entries(store.listUsers());
         if (!users.length) {
-            await respond({ text: "未有人用過 /j" });
+            await respond({ text: "未有人用過 /j", ...cmdVis() });
             return;
         }
         const medal = ["🥇", "🥈", "🥉"];
@@ -780,7 +793,7 @@ export async function startSlack(): Promise<App | null> {
                 const emoji = medal[idx] ?? shit;
                 return `${emoji} Day${st.day || 0} | ${st.first_name || st.day}`;
             });
-        await respond({ text: lines.join("\n"), response_type: "in_channel" });
+        await respond({ text: lines.join("\n"), ...cmdVis() });
     });
 
     // ── /marksix_remind（per-channel toggle）──
@@ -790,6 +803,7 @@ export async function startSlack(): Promise<App | null> {
         const cfg = store.getMarksix(channelId);
         const state = cfg?.enabled ? "🟢 已開啟" : "🔴 已停用";
         await respond({
+            ...cmdVis(),
             text: `🎰 馬會提醒（呢個 channel）— ${state}`,
             blocks: [
                 { type: "section", text: { type: "mrkdwn", text: `🎰 *馬會提醒*（channel）— ${state}` } },
@@ -921,13 +935,13 @@ export async function startSlack(): Promise<App | null> {
     app.command("/quit", async ({ ack, respond, command }) => {
         await ack();
         if (!SLACK_ADMIN_IDS.includes(command.user_id)) {
-            await respond({ text: "踢你老母臭（得 admin 先可以叫我走）" });
+            await respond({ text: "踢你老母臭（得 admin 先可以叫我走）", ...cmdVis() });
             return;
         }
         try {
             await app.client.conversations.leave({ channel: command.channel_id });
         } catch (err: any) {
-            await respond({ text: `離開唔到: ${err?.message || "未知錯誤"}` });
+            await respond({ text: `離開唔到: ${err?.message || "未知錯誤"}`, ...cmdVis() });
         }
     });
 
