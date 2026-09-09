@@ -3,7 +3,7 @@
  *
  * 共用：
  *   - src/ai/engine.ts    runAIRoundTrip（multi-round tool loop）/ parseReplyPlan / extractUserSkill
- *   - src/ai               getGeminiImage / getSystemPrompt / saveUserSkill / tools
+ *   - src/ai               generateImage / getSystemPrompt / saveUserSkill / tools
  *   - src/tools             weather / markSixReminder / from / date
  *   - src/utils/dayjs
  * Slack 專用 state 存 chat/slack-state.json（見 slack-store.ts），唔掂 Telegram 啲 Mongo data。
@@ -25,7 +25,7 @@ import dayjs from "dayjs";
 import { weather } from "../tools/weather";
 import { markSixReminder } from "../tools/marksix";
 import { from, validateJCount } from "../tools/date";
-import { getGeminiImage } from "../ai";
+import { generateImage } from "../ai";
 import {
     runAIRoundTrip,
     parseReplyPlan,
@@ -260,7 +260,7 @@ async function handleSlackMessageText(client: any, opts: {
 
     if (plan.genImage) {
         await post(plan.genImage.isEdit ? "執緊...📸" : "畫緊...").catch(() => {});
-        const { text, imageData } = await getGeminiImage({
+        const { text, imageData } = await generateImage({
             prompt: plan.genImage.prompt,
             inputImage: plan.genImage.isEdit ? opts.imageData : undefined,
         });
@@ -577,7 +577,9 @@ export async function startSlack(): Promise<App | null> {
                 ? process.env.DEEPSEEK_MODEL || "deepseek-chat"
                 : aiProvider === "gpt"
                     ? process.env.AZURE_OPENAI_URL?.match(/deployments\/([^/?]+)/)?.[1] || "gpt"
-                    : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+                    : aiProvider === "glm"
+                        ? process.env.GLM_MODEL || "glm-5.3-flash"
+                        : process.env.GEMINI_MODEL || "gemini-3.6-flash";
         const lines: string[] = [`🧪 Slack Health Check（uptime ${formatUptime(process.uptime())}）`];
         lines.push(`• AI: ${aiProvider} / ${aiModel}`);
         const tunIP = detectTunnelIP();
@@ -648,7 +650,7 @@ export async function startSlack(): Promise<App | null> {
         }
         await respond({ text: "畫緊...", ...cmdVis() });
         try {
-            const { text, imageData } = await getGeminiImage({ prompt });
+            const { text, imageData } = await generateImage({ prompt });
             if (imageData) {
                 const buffer = Buffer.from(imageData.data, "base64");
                 const ext = (imageData.mimeType.split("/")[1] || "png").replace("jpeg", "jpg");

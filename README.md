@@ -8,7 +8,7 @@ Telegram bot（Telegraf）+ 可選嘅 **Slack bot**（@slack/bolt + Socket Mode�
 
 - **AI 對話** — @bot 即可對話，支援 tool calling（讀取 URL 內容）
 - **網上搜尋** — AI 可用 `web_search` 搜尋並查證（歌詞 / 新聞 / 冷知識等），唔使靠記憶
-- **多 AI Provider** — 可切換 Gemini / DeepSeek / GPT
+- **多 AI Provider** — 可切換 Gemini / DeepSeek / GPT / GLM（智譜）
 - **圖片生成** — AI 回覆含 `gen image <描述>` 就自動生圖
 - **圖片辨識** — 傳相 + @bot caption 即分析
 - **貼圖辨識** — 貼圖內容自動分析（靜態用原圖，animated/video 用 thumbnail 預覽）+ 本地 cache（`chat/sticker-cache.json`），寫入聊天歷史俾 AI 睇
@@ -80,6 +80,11 @@ Slack 支援嘅功能：
 | `DEEPSEEK_BASE_URL` | DeepSeek API base | `https://api.deepseek.com` |
 | `AZURE_OPENAI_URL` | GPT（Azure OpenAI）endpoint | - |
 | `AZURE_OPENAI_KEY` | GPT API key | - |
+| `GLM_API_KEY` | GLM（智譜 Zhipu）API key | - |
+| `GLM_MODEL` | GLM model | `glm-5.3-flash` |
+| `GLM_BASE_URL` | GLM API base | `https://open.bigmodel.cn/api/paas/v4` |
+| `GLM_IMAGE_MODEL` | GLM 生圖（CogView）model（`AI_PROVIDER=glm` 用） | `cogview-4-250304` |
+| `GLM_IMAGE_SIZE` | GLM 生圖尺寸 | `1024x1024` |
 | `CHAT_CONTEXT_SIZE` | 每次送俾 AI 嘅歷史行數 | `30` |
 | `MAX_HISTORY_LINES` | 歷史檔案最大行數（超過刪舊） | `200` |
 | `MONGOURL` | MongoDB connection string | 必填 |
@@ -132,6 +137,14 @@ src/
 AI_PROVIDER=gemini    # 預設
 AI_PROVIDER=deepseek  # 需要 DEEPSEEK_API_KEY
 AI_PROVIDER=gpt       # 需要 AZURE_OPENAI_URL + AZURE_OPENAI_KEY
+AI_PROVIDER=glm       # 需要 GLM_API_KEY（智譜）
+
+GLM 可以喺 env 揀 model（BigModel Console 攞 key）：
+
+```env
+GLM_MODEL=glm-5.3-flash  # 快（預設）
+GLM_MODEL=glm-5.3-plus   # 更勁（要訂閱）
+```
 ```
 
 所有 provider 回傳格式一致（`message` / `toolCalls` / `usage`），都支援 tool calling，唔使改 bot 邏輯。

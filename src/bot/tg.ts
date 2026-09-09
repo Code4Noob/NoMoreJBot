@@ -18,7 +18,7 @@ import {
     resolveStickerId,
 } from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
-import { getGeminiImage } from "../ai";
+import { generateImage } from "../ai";
 import { runAIRoundTrip } from "../ai/engine";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 import {
@@ -164,7 +164,9 @@ bot.help(async (ctx) => {
               ? process.env.AZURE_OPENAI_URL?.match(
                     /deployments\/([^/?]+)/
                 )?.[1] || "gpt"
-              : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+              : aiProvider === "glm"
+                ? process.env.GLM_MODEL || "glm-5.3-flash"
+                : process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
     const lines: string[] = [
         `🧪 Health Check（uptime ${formatUptime(process.uptime())}）`,
@@ -518,7 +520,7 @@ async function handleAIRequest(
 
             try {
                 await ctx.reply(isEdit ? "執緊...📸" : "畫緊...");
-                const { text, imageData } = await getGeminiImage({
+                const { text, imageData } = await generateImage({
                     prompt: imagePrompt,
                     inputImage: isEdit ? inputPhoto : undefined,
                 });
@@ -810,7 +812,7 @@ bot.command("draw", async (ctx) => {
     }
     try {
         await ctx.reply("畫緊...");
-        const { text, imageData } = await getGeminiImage({ prompt });
+        const { text, imageData } = await generateImage({ prompt });
         if (imageData) {
             const buffer = Buffer.from(imageData.data, "base64");
             await ctx.replyWithPhoto(
