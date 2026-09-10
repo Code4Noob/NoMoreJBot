@@ -20,6 +20,7 @@ import {
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
 import { generateImage } from "../ai";
 import { runAIRoundTrip } from "../ai/engine";
+import { formatQuotaMessage } from "../ai/usage";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 import {
     registerReminderWizard,
@@ -746,6 +747,11 @@ bot.action(/^cancelResetDay:(\d+)$/, async (ctx: any) => {
     await ctx.editMessageText("已取消 🙅");
 });
 // bot.on(message("sticker"), (ctx) => ctx.reply("👍"));
+// 今日 AI 用量 + limit
+bot.command("quota", async (ctx) => {
+    await ctx.reply(formatQuotaMessage());
+});
+
 bot.command("users", async (ctx) => {
     const chat = await Chat.findOne({ id: ctx.chat.id });
     if (!chat) {

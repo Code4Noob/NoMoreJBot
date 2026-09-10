@@ -101,7 +101,41 @@ export function checkDailyLimit(): string | null {
     return null;
 }
 
-/** 限額設定（俾 /usage 之類 command 顯示用） */
+/** 限額設定（俾 /quota 之類 command 顯示用） */
 export function getLimitConfig() {
     return { DAILY_TOKEN_LIMIT, DAILY_COST_LIMIT };
+}
+
+/** /quota 用：今日用量 + limit 一眼睇晒 */
+export function formatQuotaMessage(): string {
+    const state = getTodayUsage();
+    const { DAILY_TOKEN_LIMIT: tokenLimit, DAILY_COST_LIMIT: costLimit } =
+        getLimitConfig();
+
+    const lines: string[] = ["📊 今日 AI 用量（" + state.date + "）"];
+
+    const tokenPart = tokenLimit
+        ? `${state.total.tokens.toLocaleString()} / ${tokenLimit.toLocaleString()} tokens（${((state.total.tokens / tokenLimit) * 100).toFixed(1)}%）`
+        : `${state.total.tokens.toLocaleString()} tokens（未設 limit）`;
+    const costPart = costLimit
+        ? `≈$${state.total.cost.toFixed(4)} / $${costLimit.toFixed(2)} USD（${((state.total.cost / costLimit) * 100).toFixed(1)}%）`
+        : `≈$${state.total.cost.toFixed(4)} USD（未設 limit）`;
+    lines.push(`• 總計: ${tokenPart} | ${costPart}`);
+
+    const providers = Object.entries(state.byProvider).sort(
+        (a, b) => b[1].tokens - a[1].tokens
+    );
+    for (const [provider, u] of providers) {
+        lines.push(
+            `  ↳ ${provider}: ${u.tokens.toLocaleString()} tokens | ≈$${u.cost.toFixed(4)}`
+        );
+    }
+    if (providers.length === 0) lines.push("  ↳ 今日仲未使過 😴");
+
+    lines.push(
+        tokenLimit || costLimit
+            ? "• 爆 limit 之後 bot 會拒絕 AI request，第二日自動 reset"
+            : "• 設 AI_DAILY_TOKEN_LIMIT / AI_DAILY_COST_LIMIT 可以開 limit"
+    );
+    return lines.join("\n");
 }

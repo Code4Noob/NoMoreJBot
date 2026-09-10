@@ -33,6 +33,7 @@ import {
     splitSections,
 } from "../ai/engine";
 import { getSystemPrompt } from "../ai/skill";
+import { formatQuotaMessage } from "../ai/usage";
 import { detectTunnelIP } from "../utils/vpn";
 import { dbHealthCheck } from "../db";
 import * as store from "./slack-store";
@@ -614,6 +615,12 @@ export async function startSlack(): Promise<App | null> {
             lines.push(`• DB: ⚠️ ${e?.message || "err"}`);
         }
         await respond({ text: lines.join("\n"), ...cmdVis() });
+    });
+
+    // ── /quota（今日 AI 用量 + limit）──
+    app.command("/quota", async ({ ack, respond }) => {
+        await ack();
+        await respond({ text: formatQuotaMessage(), ...cmdVis() });
     });
 
     // ── /weather ──
