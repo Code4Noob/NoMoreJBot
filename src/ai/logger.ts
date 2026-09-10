@@ -37,16 +37,16 @@ export function estimateCost(
         PRICES[(process.env.AI_PROVIDER || "gemini").toLowerCase()];
     if (!price) return null;
 
-    // env 覆蓋
-    const p =
-        Number(process.env[`${provider.toUpperCase()}_PRICE_PROMPT`]) ||
-        price.prompt;
-    const c =
-        Number(process.env[`${provider.toUpperCase()}_PRICE_CACHED`]) ||
-        price.cached;
-    const comp =
-        Number(process.env[`${provider.toUpperCase()}_PRICE_COMPLETION`]) ||
-        price.completion;
+    // env 覆蓋（用 nullish check，唔好用 || —— 否則設 0 會變 falsy 跌返用預設價）
+    const envPrice = (key: string, fallback: number): number => {
+        const raw = process.env[`${provider.toUpperCase()}_${key}`];
+        if (raw === undefined || raw.trim() === "") return fallback;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : fallback;
+    };
+    const p = envPrice("PRICE_PROMPT", price.prompt);
+    const c = envPrice("PRICE_CACHED", price.cached);
+    const comp = envPrice("PRICE_COMPLETION", price.completion);
 
     const prompt = usage.prompt_tokens ?? 0;
     const cached = Math.min(usage.cached_tokens ?? 0, prompt);
