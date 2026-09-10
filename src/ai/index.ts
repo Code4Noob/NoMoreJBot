@@ -2,6 +2,7 @@ import { getGeminiResponse, getGeminiImage, GEMINI_MODEL } from "./models/gemini
 import { getDeepSeekResponse, DEEPSEEK_MODEL } from "./models/deepseek";
 import { getGptResponse, GPT_MODEL } from "./models/gpt";
 import { getGlmResponse, getGlmImage, GLM_MODEL } from "./models/glm";
+import { getOpenRouterResponse, OPENROUTER_MODEL } from "./models/openrouter";
 import { functionHandlers, toolList, toolsConfig } from "./tools";
 import { checkDailyLimit } from "./usage";
 import type { AIRequest, AIResponse } from "./types";
@@ -10,21 +11,29 @@ import type { AIRequest, AIResponse } from "./types";
  * 統一 AI 入口：根據 .env 嘅 AI_PROVIDER 選用唔同 model。
  *
  * 支援：
- *   AI_PROVIDER=gemini    -> Gemini（預設）
- *   AI_PROVIDER=deepseek  -> DeepSeek V4
- *   AI_PROVIDER=gpt       -> GPT（Azure OpenAI）
- *   AI_PROVIDER=glm       -> GLM（智譜 Zhipu BigModel）
+ *   AI_PROVIDER=gemini      -> Gemini（預設）
+ *   AI_PROVIDER=deepseek    -> DeepSeek V4
+ *   AI_PROVIDER=gpt         -> GPT（Azure OpenAI）
+ *   AI_PROVIDER=glm         -> GLM（智譜 Zhipu BigModel）
+ *   AI_PROVIDER=openrouter  -> OpenRouter（一個 key 用齊所有 vendor 嘅 model）
  */
 const activeProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
-const activeModel =
-    activeProvider === "deepseek"
-        ? DEEPSEEK_MODEL
-        : activeProvider === "gpt"
-          ? GPT_MODEL
-          : activeProvider === "glm"
-            ? GLM_MODEL
-            : GEMINI_MODEL;
+
+// provider -> model 對照表（加新 provider 時喺度加一行就得）
+const MODEL_MAP: Record<string, string> = {
+    deepseek: DEEPSEEK_MODEL,
+    gpt: GPT_MODEL,
+    glm: GLM_MODEL,
+    openrouter: OPENROUTER_MODEL,
+    gemini: GEMINI_MODEL,
+};
+const activeModel = MODEL_MAP[activeProvider] ?? "unknown";
 console.log(`🤖 AI Model: ${activeProvider} / ${activeModel}`);
+
+/** /help 之類 health check 用：而家用緊邊個 provider / model */
+export function getActiveAI(): { provider: string; model: string } {
+    return { provider: activeProvider, model: activeModel };
+}
 
 export async function getAIResponse(opts: AIRequest): Promise<AIResponse> {
     // 每日用量 limit：爆咗就唔好再燒錢，直接回覆用戶
@@ -41,6 +50,8 @@ export async function getAIResponse(opts: AIRequest): Promise<AIResponse> {
             return getGptResponse(opts);
         case "glm":
             return getGlmResponse(opts);
+        case "openrouter":
+            return getOpenRouterResponse(opts);
         case "gemini":
         default:
             return getGeminiResponse(opts);
@@ -68,7 +79,7 @@ export async function generateImage(opts: {
     const chain: string[] = [];
     if (activeProvider === "glm") chain.push("glm");
     if (activeProvider === "gemini") chain.push("gemini");
-    if (activeProvider === "deepseek" || activeProvider === "gpt") {
+    if (activeProvider === "deepseek" || activeProvider === "gpt" || activeProvider === "openrouter") {
         // 有 GLM key 就用 GLM CogView 做主力（唔使撞 invalid Gemini key），Gemini 做後備
         if (process.env.GLM_API_KEY) chain.push("glm", "gemini");
         else chain.push("gemini", "glm");

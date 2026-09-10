@@ -25,7 +25,7 @@ import dayjs from "dayjs";
 import { weather } from "../tools/weather";
 import { markSixReminder } from "../tools/marksix";
 import { from, validateJCount } from "../tools/date";
-import { generateImage } from "../ai";
+import { generateImage, getActiveAI } from "../ai";
 import {
     runAIRoundTrip,
     parseReplyPlan,
@@ -598,15 +598,7 @@ export async function startSlack(): Promise<App | null> {
     // ── /help（health check，同 tg 差唔多）──
     app.command("/help", async ({ ack, respond }) => {
         await ack();
-        const aiProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
-        const aiModel =
-            aiProvider === "deepseek"
-                ? process.env.DEEPSEEK_MODEL || "deepseek-chat"
-                : aiProvider === "gpt"
-                    ? process.env.AZURE_OPENAI_URL?.match(/deployments\/([^/?]+)/)?.[1] || "gpt"
-                    : aiProvider === "glm"
-                        ? process.env.GLM_MODEL || "glm-5.3-flash"
-                        : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+        const { provider: aiProvider, model: aiModel } = getActiveAI();
         const lines: string[] = [`🧪 Slack Health Check（uptime ${formatUptime(process.uptime())}）`];
         lines.push(`• AI: ${aiProvider} / ${aiModel}`);
         const tunIP = detectTunnelIP();

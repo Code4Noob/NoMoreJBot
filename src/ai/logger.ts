@@ -15,6 +15,8 @@ const PRICES: Record<
     glm: { prompt: 0.6, cached: 0.11, completion: 2.2 },
     gpt: { prompt: 2.5, cached: 1.25, completion: 10 },
     gemini: { prompt: 1.25, cached: 0.31, completion: 10 },
+    // OpenRouter 價格因 model 而異——記得用 OPENROUTER_PRICE_* env 覆蓋做實際價
+    openrouter: { prompt: 1, cached: 0.5, completion: 3 },
 };
 
 export interface UsageDetail {

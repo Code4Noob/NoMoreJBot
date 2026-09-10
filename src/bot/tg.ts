@@ -18,7 +18,7 @@ import {
     resolveStickerId,
 } from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
-import { generateImage } from "../ai";
+import { generateImage, getActiveAI } from "../ai";
 import { runAIRoundTrip } from "../ai/engine";
 import { formatQuotaMessage } from "../ai/usage";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
@@ -172,17 +172,7 @@ function truncateCaption(s: string): string {
 
 // /help -> Health Check（回報 bot / AI / VPN 狀態）
 bot.help(async (ctx) => {
-    const aiProvider = (process.env.AI_PROVIDER || "gemini").toLowerCase();
-    const aiModel =
-        aiProvider === "deepseek"
-            ? process.env.DEEPSEEK_MODEL || "deepseek-chat"
-            : aiProvider === "gpt"
-              ? process.env.AZURE_OPENAI_URL?.match(
-                    /deployments\/([^/?]+)/
-                )?.[1] || "gpt"
-              : aiProvider === "glm"
-                ? process.env.GLM_MODEL || "glm-5.3-flash"
-                : process.env.GEMINI_MODEL || "gemini-3.6-flash";
+    const { provider: aiProvider, model: aiModel } = getActiveAI();
 
     const lines: string[] = [
         `🧪 Health Check（uptime ${formatUptime(process.uptime())}）`,
