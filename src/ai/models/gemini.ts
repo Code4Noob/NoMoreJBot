@@ -284,11 +284,23 @@ export async function getGeminiResponse({
 
         const message = textParts.length > 0 ? textParts.join("\n") : null;
 
+        // Gemini usageMetadata：thoughtsTokenCount（思考 token）都係要俾錢嘅 completion
+        const usageMeta = data.usageMetadata ?? {};
+        const usage = {
+            total_tokens: usageMeta.totalTokenCount ?? 0,
+            prompt_tokens: usageMeta.promptTokenCount ?? 0,
+            completion_tokens:
+                (usageMeta.candidatesTokenCount ?? 0) +
+                (usageMeta.thoughtsTokenCount ?? 0),
+            cached_tokens: usageMeta.cachedContentTokenCount ?? 0,
+        };
+
         logAIResponse({
             provider: "gemini",
             model: GEMINI_MODEL,
             finishReason: candidate.finishReason,
-            tokens: totalTokens,
+            tokens: usage.total_tokens,
+            usage,
             toolCalls: toolCalls.length,
             toolNames: toolCalls.map((tc) => tc.function.name),
             message,

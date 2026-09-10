@@ -89,11 +89,22 @@ export async function getDeepSeekResponse({
             },
         }));
 
+        // DeepSeek usage: prompt_cache_hit_tokens 係平價 cached tokens（billing 明細）
+        const usage = {
+            total_tokens: data.usage?.total_tokens ?? 0,
+            prompt_tokens: data.usage?.prompt_tokens ?? 0,
+            completion_tokens: data.usage?.completion_tokens ?? 0,
+            cached_tokens:
+                data.usage?.prompt_cache_hit_tokens ??
+                data.usage?.prompt_tokens_details?.cached_tokens ??
+                0,
+        };
         logAIResponse({
             provider: "deepseek",
             model,
             finishReason: choice?.finish_reason,
-            tokens: data.usage?.total_tokens ?? 0,
+            tokens: usage.total_tokens,
+            usage,
             toolCalls: toolCalls?.length ?? 0,
             toolNames: toolCalls?.map((tc: any) => tc.function.name),
             message: msg?.content || null,
