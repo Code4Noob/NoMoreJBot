@@ -566,7 +566,9 @@ export async function startSlack(): Promise<App | null> {
             if (!text.trim() && !imageData) return;
             await handleSlackMessageText(client, {
                 channelId,
-                threadTs: isDM ? undefined : replyThreadTs(msg.ts, msg.thread_ts),
+                // DM：bot 係 agent app，top-level message 會跌入「History」tab 唔會喺
+                // Chat tab 出現——一定要 thread reply 返用戶句 message 先會顯示喺 Chat
+                threadTs: replyThreadTs(msg.ts, msg.thread_ts),
                 userId: msg.user,
                 text,
                 imageData,
