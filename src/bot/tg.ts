@@ -333,6 +333,8 @@ async function handleAIRequest(
         imageData?: { mimeType: string; data: string } | null;
     }
 ) {
+    // 「輸入中…」指示器：sendChatAction 只維持 ~5 秒，要 interval 不斷續命
+    const stopTyping = startTyping(ctx);
     try {
         // 支援非文字訊息（例如 sticker reply）——冇 text 就用預設 prompt
         const rawText = ctx.message.text || "";
@@ -573,7 +575,17 @@ async function handleAIRequest(
             error?.message ||
             "未知錯誤";
         await ctx.reply(`${errMsg}`).catch(() => {});
+    } finally {
+        stopTyping();
     }
+}
+
+// 「輸入中…」指示器：處理 AI 期間不斷 sendChatAction，回覆／出錯就停
+function startTyping(ctx: any): () => void {
+    const send = () => ctx.sendChatAction?.("typing").catch(() => {});
+    send();
+    const timer = setInterval(send, 4500);
+    return () => clearInterval(timer);
 }
 
 // Mentions
