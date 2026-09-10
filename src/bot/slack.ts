@@ -228,6 +228,17 @@ async function handleSlackMessageText(client: any, opts: {
             ...(threadTs ? { thread_ts: threadTs } : {}),
         });
 
+    // 「輸入中…」狀態（agent app 專用 API）：要 thread_ts 先可以 set；bot 出 message 落
+    // 呢條 thread 嗰陣 Slack 會自動剷走個 status
+    if (threadTs) {
+        await client.apiCall("assistant.threads.setStatus", {
+            channel_id: channelId,
+            thread_ts: threadTs,
+            status: "處理緊你嘅需求…",
+            loading: true,
+        } as any).catch(() => {});
+    }
+
     const { reply: engineReply, usage } = await runAIRoundTrip({
         initialMessages: chatContext.slice(-6),
         contextMessages,
