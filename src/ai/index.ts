@@ -3,6 +3,7 @@ import { getDeepSeekResponse, DEEPSEEK_MODEL } from "./models/deepseek";
 import { getGptResponse, GPT_MODEL } from "./models/gpt";
 import { getGlmResponse, getGlmImage, GLM_MODEL } from "./models/glm";
 import { functionHandlers, toolList, toolsConfig } from "./tools";
+import { checkDailyLimit } from "./usage";
 import type { AIRequest, AIResponse } from "./types";
 
 /**
@@ -26,6 +27,13 @@ const activeModel =
 console.log(`🤖 AI Model: ${activeProvider} / ${activeModel}`);
 
 export async function getAIResponse(opts: AIRequest): Promise<AIResponse> {
+    // 每日用量 limit：爆咗就唔好再燒錢，直接回覆用戶
+    const limitMsg = checkDailyLimit();
+    if (limitMsg) {
+        console.log(`🛑 AI daily limit reached，擋住 request`);
+        return { message: limitMsg, toolCalls: undefined, usage: 0 };
+    }
+
     switch (activeProvider) {
         case "deepseek":
             return getDeepSeekResponse(opts);

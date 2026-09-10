@@ -1,4 +1,5 @@
 // 統一 AI response logging
+import { recordAIUsage } from "./usage";
 
 /**
  * 價格表（USD per 1M tokens）。可以用 env 覆蓋：
@@ -82,4 +83,6 @@ export function logAIResponse(opts: {
     console.log(
         `[AI:${opts.provider}] ${opts.model} | finish=${opts.finishReason ?? "n/a"} | tokens=${opts.tokens ?? 0}${usageStr}${costStr} | ${tools}\n  ↳ ${preview || fallbackPreview}`
     );
+    // 累計今日用量（tokens + cost），爆 limit 就擋返下一次 request
+    recordAIUsage(opts.provider, opts.usage);
 }
