@@ -36,6 +36,21 @@ const bot: Telegraf = new Telegraf(process.env.BOT_TOKEN as string, {
     handlerTimeout: Number(process.env.HANDLER_TIMEOUT_MS) || 300_000,
 });
 
+// ⚡ 並行處理 updates：Telegraf 長 polling 預設會 await 完成個 middleware chain 先攞下一批
+// update，一個 AI request（成 30–60s）會阻住所有其他用戶嘅訊息。
+// 呢度第一個 middleware 直接 fire-and-forget 埋後面嘅 chain，polling loop 即刻可以
+// 繼續收下一個 update —— 兩個用戶同時 @bot 都會同時處理。
+bot.use((ctx: any, next: any) => {
+    void Promise.resolve()
+        .then(() => next())
+        .catch((err: any) =>
+            console.error(
+                "❌ update 處理錯誤:",
+                err?.message || err
+            )
+        );
+});
+
 // 啟動時為舊 sticker cache entry 補返 fileId（俾 get_cached_stickers 用到）
 backfillStickerCache(bot.telegram).catch((err) =>
     console.log("⚠️ sticker cache backfill 失敗:", err?.message || err)
