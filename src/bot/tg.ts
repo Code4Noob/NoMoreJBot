@@ -21,6 +21,13 @@ import vpnAxios, { detectTunnelIP } from "../utils/vpn";
 import { generateImage, getActiveAI } from "../ai";
 import { runAIRoundTrip } from "../ai/engine";
 import { formatQuotaMessage } from "../ai/usage";
+import {
+    pauseAI,
+    resumeAI,
+    isAIPaused,
+    getPausedChannels,
+    AI_PAUSED_MSG,
+} from "../ai/pause";
 import { getSystemPrompt, saveUserSkill } from "../ai/skill";
 import {
     registerReminderWizard,
@@ -333,6 +340,11 @@ async function handleAIRequest(
         imageData?: { mimeType: string; data: string } | null;
     }
 ) {
+    // 呢條 channel 被 admin pause 咗 → 唔好燒 token
+    if (isAIPaused(ctx.chat?.id)) {
+        await ctx.reply(AI_PAUSED_MSG);
+        return;
+    }
     // 「輸入中…」指示器：sendChatAction 只維持 ~5 秒，要 interval 不斷續命
     const stopTyping = startTyping(ctx);
     try {
@@ -752,6 +764,45 @@ bot.action(/^cancelResetDay:(\d+)$/, async (ctx: any) => {
 // 今日 AI 用量 + limit
 bot.command("quota", async (ctx) => {
     await ctx.reply(formatQuotaMessage());
+});
+
+/** admin 檢查：group 用 Telegram chat admin；私聊 admin 用 TG_ADMIN_IDS env（可選） */
+async function isTGAdmin(ctx: any): Promise<boolean> {
+    const envAdmins = (process.env.TG_ADMIN_IDS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (envAdmins.includes(String(ctx.from?.id))) return true;
+    if (ctx.chat?.type === "private") return true; // 私聊自己話事
+    try {
+        const admins = await ctx.getChatAdministrators();
+        return admins.some((a: any) => a.user?.id === ctx.from?.id);
+    } catch {
+        return false;
+    }
+}
+
+// 暫停 / 恢復呢條 channel 嘅 AI（admin only）
+bot.command("pause", async (ctx) => {
+    if (!(await isTGAdmin(ctx))) {
+        await ctx.reply("❌ 只有 admin 先可以 pause AI");
+        return;
+    }
+    pauseAI(ctx.chat.id);
+    const all = getPausedChannels();
+    await ctx.reply(`😴 AI 已暫停 ， /resume 恢復`);
+});
+
+bot.command("resume", async (ctx) => {
+    if (!(await isTGAdmin(ctx))) {
+        await ctx.reply("❌ 只有 admin 先可以 resume AI");
+        return;
+    }
+    resumeAI(ctx.chat.id);
+    const all = getPausedChannels();
+    await ctx.reply(
+        all.length ? `✅ AI 已恢復（仲有 ${all.length} 條 channel 暫停緊）` : "✅ AI 已恢復，冇任何 channel 暫停緊"
+    );
 });
 
 bot.command("users", async (ctx) => {

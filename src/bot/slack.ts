@@ -34,6 +34,13 @@ import {
 } from "../ai/engine";
 import { getSystemPrompt } from "../ai/skill";
 import { formatQuotaMessage } from "../ai/usage";
+import {
+    pauseAI,
+    resumeAI,
+    isAIPaused,
+    getPausedChannels,
+    AI_PAUSED_MSG,
+} from "../ai/pause";
 import { detectTunnelIP } from "../utils/vpn";
 import { dbHealthCheck } from "../db";
 import * as store from "./slack-store";
@@ -192,6 +199,15 @@ async function handleSlackMessageText(client: any, opts: {
     imageData?: { mimeType: string; data: string } | null;
 }) {
     const { channelId, threadTs, userId } = opts;
+    // 呢條 channel 被 admin pause 咗 → 唔好燒 token
+    if (isAIPaused(channelId)) {
+        await client.chat.postMessage({
+            channel: channelId,
+            text: AI_PAUSED_MSG,
+            ...(threadTs ? { thread_ts: threadTs } : {}),
+        });
+        return;
+    }
     const userName = await getUserName(client, userId);
     const chatName = await getChannelName(client, channelId);
     const prompt = opts.text.trim() || "（用圖片問你）";
@@ -967,6 +983,37 @@ export async function startSlack(): Promise<App | null> {
             user: meta.user_id,
             text: `✅ 已設定提醒：\n📝 ${text}\n⏰ ${remindAt.format("YYYY-MM-DD HH:mm")}（${name}）`,
         }).catch(() => {});
+    });
+
+    // ── /pause、/resume（admin only：暫停 / 恢復呢條 channel 嘅 AI）──
+    app.command("/pause", async ({ ack, respond, command }) => {
+        await ack();
+        if (!SLACK_ADMIN_IDS.includes(command.user_id)) {
+            await respond({ text: "❌ 得 admin 先可以 pause AI（SLACK_ADMIN_IDS）", ...cmdVis() });
+            return;
+        }
+        pauseAI(command.channel_id);
+        const all = getPausedChannels();
+        await respond({
+            text: `😴 AI 已暫停 ， /resume 恢復`,
+            ...cmdVis(),
+        });
+    });
+
+    app.command("/resume", async ({ ack, respond, command }) => {
+        await ack();
+        if (!SLACK_ADMIN_IDS.includes(command.user_id)) {
+            await respond({ text: "❌ 得 admin 先可以 resume AI（SLACK_ADMIN_IDS）", ...cmdVis() });
+            return;
+        }
+        resumeAI(command.channel_id);
+        const all = getPausedChannels();
+        await respond({
+            text: all.length
+                ? `✅ AI 已恢復（仲有 ${all.length} 條 channel 暫停緊）`
+                : "✅ AI 已恢復，冇任何 channel 暫停緊",
+            ...cmdVis(),
+        });
     });
 
     // ── /quit（admin only：app 離開 channel）──
