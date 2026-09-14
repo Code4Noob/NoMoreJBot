@@ -30,6 +30,8 @@ const BOT_COMMANDS: BotCommandEntry[] = [
     },
     { command: "reminder", description: "Set a reminder (date/time picker)" },
     { command: "quota", description: "Show API quota" },
+    { command: "pause", description: "Admin only: pause AI in this channel" },
+    { command: "resume", description: "Admin only: resume AI in this channel" },
 ];
 
 /**
