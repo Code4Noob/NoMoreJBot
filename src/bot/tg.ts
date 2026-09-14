@@ -52,10 +52,7 @@ bot.use((ctx: any, next: any) => {
     void Promise.resolve()
         .then(() => next())
         .catch((err: any) =>
-            console.error(
-                "❌ update 處理錯誤:",
-                err?.message || err
-            )
+            console.error("❌ update 處理錯誤:", err?.message || err)
         );
 });
 
@@ -487,7 +484,11 @@ async function handleAIRequest(
             /\[user_skill\]\s*:\s*([\s\S]*)$|\[user_skill:\s*([\s\S]*?)\]/i
         );
         if (userSkillMatch && ctx.from?.id) {
-            const content = (userSkillMatch[1] || userSkillMatch[2] || "").trim();
+            const content = (
+                userSkillMatch[1] ||
+                userSkillMatch[2] ||
+                ""
+            ).trim();
             if (content) saveUserSkill(ctx.from.id, content);
             // 剝走 marker 同內容，淨係顯示原本嘅回覆
             reply =
@@ -800,9 +801,7 @@ bot.command("resume", async (ctx) => {
     }
     resumeAI(ctx.chat.id);
     const all = getPausedChannels();
-    await ctx.reply(
-        all.length ? `✅ AI 已恢復（仲有 ${all.length} 條 channel 暫停緊）` : "✅ AI 已恢復，冇任何 channel 暫停緊"
-    );
+    await ctx.reply(`✅ AI 已恢復`);
 });
 
 bot.command("users", async (ctx) => {

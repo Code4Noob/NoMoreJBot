@@ -91,14 +91,21 @@ let botUserId = "";
 // ─────────────────────────── file history ───────────────────────────
 function getHistoryPath(channelId: string): string {
     // channelId 係 C… / D…（ASCII，可以直接做 filename），加 prefix 同 tg 分開
-    return path.join(HISTORY_DIR, `${HISTORY_PREFIX}-${channelId}${HISTORY_SUFFIX}`);
+    return path.join(
+        HISTORY_DIR,
+        `${HISTORY_PREFIX}-${channelId}${HISTORY_SUFFIX}`
+    );
 }
 function trimHistoryFile(filePath: string): void {
     try {
         const content = fs.readFileSync(filePath, "utf-8");
         const lines = content.split("\n").filter(Boolean);
         if (lines.length > MAX_HISTORY_LINES) {
-            fs.writeFileSync(filePath, lines.slice(-MAX_HISTORY_LINES).join("\n") + "\n", "utf-8");
+            fs.writeFileSync(
+                filePath,
+                lines.slice(-MAX_HISTORY_LINES).join("\n") + "\n",
+                "utf-8"
+            );
         }
     } catch (err) {
         console.error("❌ slack trimHistoryFile 失敗:", err);
@@ -121,7 +128,11 @@ function getRecentHistory(channelId: string): string {
     try {
         const p = getHistoryPath(channelId);
         if (!fs.existsSync(p)) return "";
-        const lines = fs.readFileSync(p, "utf-8").trim().split("\n").filter(Boolean);
+        const lines = fs
+            .readFileSync(p, "utf-8")
+            .trim()
+            .split("\n")
+            .filter(Boolean);
         return lines.slice(-CONTEXT_SIZE).join("\n");
     } catch (err) {
         console.error("❌ slack getRecentHistory 失敗:", err);
@@ -140,7 +151,8 @@ async function getUserName(client: any, userId: string): Promise<string> {
     try {
         const info = await client.users.info({ user: userId });
         const u = info?.user;
-        const name = u?.real_name || u?.name || u?.profile?.display_name || userId;
+        const name =
+            u?.real_name || u?.name || u?.profile?.display_name || userId;
         userNames.set(userId, name);
         return name;
     } catch {
@@ -184,20 +196,26 @@ function canIncrementDay(isoUpdated?: string): boolean {
  * - 唔喺 thread：SLACK_REPLY_IN_THREAD=true 就喺 user 條 message 開 thread 答（thread_ts = eventTs）；
  *   預設（false）就直接出 message 去 channel（thread_ts = undefined）
  */
-function replyThreadTs(eventTs?: string, msgThreadTs?: string): string | undefined {
+function replyThreadTs(
+    eventTs?: string,
+    msgThreadTs?: string
+): string | undefined {
     if (msgThreadTs) return msgThreadTs;
     if (SLACK_REPLY_IN_THREAD && eventTs) return eventTs;
     return undefined;
 }
 
 // ─────────────────────────── AI 對話（slack）───────────────────────────
-async function handleSlackMessageText(client: any, opts: {
-    channelId: string;
-    threadTs?: string;
-    userId: string;
-    text: string;
-    imageData?: { mimeType: string; data: string } | null;
-}) {
+async function handleSlackMessageText(
+    client: any,
+    opts: {
+        channelId: string;
+        threadTs?: string;
+        userId: string;
+        text: string;
+        imageData?: { mimeType: string; data: string } | null;
+    }
+) {
     const { channelId, threadTs, userId } = opts;
     // 呢條 channel 被 admin pause 咗 → 唔好燒 token
     if (isAIPaused(channelId)) {
@@ -247,12 +265,14 @@ async function handleSlackMessageText(client: any, opts: {
     // 「輸入中…」狀態（agent app 專用 API）：要 thread_ts 先可以 set；bot 出 message 落
     // 呢條 thread 嗰陣 Slack 會自動剷走個 status
     if (threadTs) {
-        await client.apiCall("assistant.threads.setStatus", {
-            channel_id: channelId,
-            thread_ts: threadTs,
-            status: "處理緊你嘅需求…",
-            loading: true,
-        } as any).catch(() => {});
+        await client
+            .apiCall("assistant.threads.setStatus", {
+                channel_id: channelId,
+                thread_ts: threadTs,
+                status: "處理緊你嘅需求…",
+                loading: true,
+            } as any)
+            .catch(() => {});
     }
 
     const { reply: engineReply, usage } = await runAIRoundTrip({
@@ -287,7 +307,9 @@ async function handleSlackMessageText(client: any, opts: {
     const plan = parseReplyPlan(reply);
 
     if (plan.genImage) {
-        await post(plan.genImage.isEdit ? "執緊...📸" : "畫緊...").catch(() => {});
+        await post(plan.genImage.isEdit ? "執緊...📸" : "畫緊...").catch(
+            () => {}
+        );
         const { text, imageData } = await generateImage({
             prompt: plan.genImage.prompt,
             inputImage: plan.genImage.isEdit ? opts.imageData : undefined,
@@ -296,7 +318,9 @@ async function handleSlackMessageText(client: any, opts: {
         if (imageData) {
             await uploadImage(client, channelId, imageData, caption, threadTs);
         } else {
-            await post(text ? `${text}` : plan.genImage.isEdit ? "執唔到" : "畫唔到").catch(() => {});
+            await post(
+                text ? `${text}` : plan.genImage.isEdit ? "執唔到" : "畫唔到"
+            ).catch(() => {});
         }
         return;
     }
@@ -318,7 +342,10 @@ async function uploadImage(
     threadTs?: string
 ): Promise<void> {
     const buffer = Buffer.from(imageData.data, "base64");
-    const ext = (imageData.mimeType.split("/")[1] || "png").replace("jpeg", "jpg");
+    const ext = (imageData.mimeType.split("/")[1] || "png").replace(
+        "jpeg",
+        "jpg"
+    );
     try {
         await client.files.uploadV2({
             channel_id: channelId,
@@ -329,19 +356,28 @@ async function uploadImage(
         });
     } catch (err: any) {
         // 舊啲 API fallback
-        console.log("⚠️ slack files.uploadV2 失敗，fallback upload:", err?.message || err);
-        await client.files.upload({
-            channels: channelId,
-            filename: `bot-${Date.now()}.${ext}`,
-            file: buffer,
-            initial_comment: caption || "",
-            ...(threadTs ? { thread_ts: threadTs } : {}),
-        }).catch((e2: any) => console.log("❌ slack file upload 失敗:", e2?.message || e2));
+        console.log(
+            "⚠️ slack files.uploadV2 失敗，fallback upload:",
+            err?.message || err
+        );
+        await client.files
+            .upload({
+                channels: channelId,
+                filename: `bot-${Date.now()}.${ext}`,
+                file: buffer,
+                initial_comment: caption || "",
+                ...(threadTs ? { thread_ts: threadTs } : {}),
+            })
+            .catch((e2: any) =>
+                console.log("❌ slack file upload 失敗:", e2?.message || e2)
+            );
     }
 }
 
 /** 下載 Slack file（image）做 base64，餵俾 AI vision / image edit */
-async function downloadSlackFile(file: any): Promise<{ mimeType: string; data: string } | null> {
+async function downloadSlackFile(
+    file: any
+): Promise<{ mimeType: string; data: string } | null> {
     const mime = file?.mimetype || "";
     if (!mime.startsWith("image/")) return null;
     const url = file?.url_private;
@@ -362,10 +398,14 @@ async function downloadSlackFile(file: any): Promise<{ mimeType: string; data: s
 }
 
 // 從 message event 攞第一張 image（file_share / files）
-async function firstImageData(client: any, event: any): Promise<{ mimeType: string; data: string } | null> {
-    const files = event?.files && event.files.length > 0
-        ? event.files
-        : event?.message?.files;
+async function firstImageData(
+    client: any,
+    event: any
+): Promise<{ mimeType: string; data: string } | null> {
+    const files =
+        event?.files && event.files.length > 0
+            ? event.files
+            : event?.message?.files;
     if (!files || !files.length) return null;
     // 有啲 case file 得 id，要 files.info 攞 url_private
     for (const f of files) {
@@ -385,7 +425,12 @@ async function firstImageData(client: any, event: any): Promise<{ mimeType: stri
 // ─────────────────────────── marksix scheduler ───────────────────────────
 const marksixJobs = new Map<string, ScheduledTask>();
 
-function scheduleMarksixChannel(client: any, channelId: string, cronExpr: string, timezone: string): boolean {
+function scheduleMarksixChannel(
+    client: any,
+    channelId: string,
+    cronExpr: string,
+    timezone: string
+): boolean {
     if (!cron.validate(cronExpr)) return false;
     try {
         marksixJobs.get(channelId)?.stop();
@@ -394,9 +439,15 @@ function scheduleMarksixChannel(client: any, channelId: string, cronExpr: string
             async () => {
                 try {
                     const message = await markSixReminder();
-                    await client.chat.postMessage({ channel: channelId, text: message });
+                    await client.chat.postMessage({
+                        channel: channelId,
+                        text: message,
+                    });
                 } catch (err: any) {
-                    console.log("🚀 ~ slack marksix reminder error:", err?.message || err);
+                    console.log(
+                        "🚀 ~ slack marksix reminder error:",
+                        err?.message || err
+                    );
                 }
             },
             { scheduled: true, timezone }
@@ -416,8 +467,15 @@ function reloadSlackMarksix(client: any): void {
         scheduleMarksixChannel(client, channelId, cfg.cron, cfg.timezone);
     }
 }
-async function enableSlackMarksix(client: any, channelId: string): Promise<boolean> {
-    const cfg = store.setMarksix(channelId, { enabled: true, cron: "0 0 * * *", timezone: "Asia/Hong_Kong" });
+async function enableSlackMarksix(
+    client: any,
+    channelId: string
+): Promise<boolean> {
+    const cfg = store.setMarksix(channelId, {
+        enabled: true,
+        cron: "0 0 * * *",
+        timezone: "Asia/Hong_Kong",
+    });
     return scheduleMarksixChannel(client, channelId, cfg.cron, cfg.timezone);
 }
 function disableSlackMarksix(channelId: string): boolean {
@@ -431,7 +489,11 @@ function disableSlackMarksix(channelId: string): boolean {
 // ─────────────────────────── reminder scheduler ───────────────────────────
 const reminderTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function scheduleSlackReminder(client: any, row: store.SlackReminderRow, late = false): void {
+function scheduleSlackReminder(
+    client: any,
+    row: store.SlackReminderRow,
+    late = false
+): void {
     const delay = Math.max(new Date(row.remindAt).getTime() - Date.now(), 0);
     if (reminderTimers.has(row.id)) clearTimeout(reminderTimers.get(row.id)!);
     const timer = setTimeout(async () => {
@@ -566,7 +628,11 @@ export async function startSlack(): Promise<App | null> {
         } catch (err: any) {
             console.log("🚀 ~ slack app_mention error:", err?.message || err);
             await client.chat
-                .postMessage({ channel: ev.channel, thread_ts: ev.thread_ts || ev.ts, text: `出錯: ${err?.message || "未知錯誤"}` })
+                .postMessage({
+                    channel: ev.channel,
+                    thread_ts: ev.thread_ts || ev.ts,
+                    text: `出錯: ${err?.message || "未知錯誤"}`,
+                })
                 .catch(() => {});
         }
     });
@@ -576,7 +642,12 @@ export async function startSlack(): Promise<App | null> {
         const msg: any = message;
         // 跳過 bot 自己 / 其他 bot / 系統訊息
         if (msg.bot_id || !msg.user) return;
-        if (msg.subtype && msg.subtype !== "file_share" && msg.subtype !== "bot_message") return;
+        if (
+            msg.subtype &&
+            msg.subtype !== "file_share" &&
+            msg.subtype !== "bot_message"
+        )
+            return;
         const channelId = msg.channel;
         if (!channelId) return;
         const isDM = channelId.startsWith("D");
@@ -584,7 +655,11 @@ export async function startSlack(): Promise<App | null> {
         if (!isDM) {
             // @bot 嘅 channel message 由 app_mention handler 處理，喺度 skip 避免 double-handle
             if ((msg.text || "").includes(`<@${botUserId}>`)) return;
-            const inBotThread = await isReplyToBotThread(client, channelId, msg);
+            const inBotThread = await isReplyToBotThread(
+                client,
+                channelId,
+                msg
+            );
             if (!inBotThread) return;
         }
         try {
@@ -606,7 +681,11 @@ export async function startSlack(): Promise<App | null> {
     });
 
     // 有冇喺 bot 開嘅 thread 度（thread root 係 bot 就當 reply-to-bot）
-    async function isReplyToBotThread(client: any, channelId: string, msg: any): Promise<boolean> {
+    async function isReplyToBotThread(
+        client: any,
+        channelId: string,
+        msg: any
+    ): Promise<boolean> {
         const threadTs = msg.thread_ts;
         if (!threadTs) return false;
         try {
@@ -626,7 +705,9 @@ export async function startSlack(): Promise<App | null> {
     app.command("/help", async ({ ack, respond }) => {
         await ack();
         const { provider: aiProvider, model: aiModel } = getActiveAI();
-        const lines: string[] = [`🧪 Slack Health Check（uptime ${formatUptime(process.uptime())}）`];
+        const lines: string[] = [
+            `🧪 Slack Health Check（uptime ${formatUptime(process.uptime())}）`,
+        ];
         lines.push(`• AI: ${aiProvider} / ${aiModel}`);
         const tunIP = detectTunnelIP();
         lines.push(tunIP ? `• VPN: ✅ up（${tunIP}）` : "• VPN: ⚠️ down");
@@ -651,7 +732,10 @@ export async function startSlack(): Promise<App | null> {
             const message = await weather();
             await respond({ text: message, ...cmdVis() });
         } catch (err: any) {
-            await respond({ text: `天氣查唔到: ${err?.message || "未知錯誤"}`, ...cmdVis() });
+            await respond({
+                text: `天氣查唔到: ${err?.message || "未知錯誤"}`,
+                ...cmdVis(),
+            });
         }
     });
 
@@ -662,7 +746,10 @@ export async function startSlack(): Promise<App | null> {
             const message = await markSixReminder();
             await respond({ text: message, ...cmdVis() });
         } catch (err: any) {
-            await respond({ text: `馬會查唔到: ${err?.message || "未知錯誤"}`, ...cmdVis() });
+            await respond({
+                text: `馬會查唔到: ${err?.message || "未知錯誤"}`,
+                ...cmdVis(),
+            });
         }
     });
 
@@ -671,7 +758,10 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const payload = (command.text || "").trim();
         if (!payload) {
-            await respond({ text: "用法：/from <日期>\n例如：/from 01-08-2026 或 /from 7 Oct", ...cmdVis() });
+            await respond({
+                text: "用法：/from <日期>\n例如：/from 01-08-2026 或 /from 7 Oct",
+                ...cmdVis(),
+            });
             return;
         }
         await respond({ text: from(payload), ...cmdVis() });
@@ -685,10 +775,15 @@ export async function startSlack(): Promise<App | null> {
             const resp = await axios.get(
                 `https://jlpt-vocab-api.vercel.app/api/words/random?level=${level}`
             );
-            const message = Object.entries(resp.data).map((x) => x.join(": ")).join("\n");
+            const message = Object.entries(resp.data)
+                .map((x) => x.join(": "))
+                .join("\n");
             await respond({ text: message, ...cmdVis() });
         } catch (error: any) {
-            await respond({ text: `JP 查唔到: ${error?.response?.data?.error || error.message}`, ...cmdVis() });
+            await respond({
+                text: `JP 查唔到: ${error?.response?.data?.error || error.message}`,
+                ...cmdVis(),
+            });
         }
     });
 
@@ -697,7 +792,10 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const prompt = (command.text || "").trim();
         if (!prompt) {
-            await respond({ text: "畫咩撚嘢？俾個描述嚟先（例如 /draw 一隻柴犬戴太陽眼鏡）", ...cmdVis() });
+            await respond({
+                text: "畫咩撚嘢？俾個描述嚟先（例如 /draw 一隻柴犬戴太陽眼鏡）",
+                ...cmdVis(),
+            });
             return;
         }
         await respond({ text: "畫緊...", ...cmdVis() });
@@ -705,7 +803,10 @@ export async function startSlack(): Promise<App | null> {
             const { text, imageData } = await generateImage({ prompt });
             if (imageData) {
                 const buffer = Buffer.from(imageData.data, "base64");
-                const ext = (imageData.mimeType.split("/")[1] || "png").replace("jpeg", "jpg");
+                const ext = (imageData.mimeType.split("/")[1] || "png").replace(
+                    "jpeg",
+                    "jpg"
+                );
                 // /draw 用 files.uploadV2 出圖 + caption
                 try {
                     await app.client.files.uploadV2({
@@ -715,13 +816,22 @@ export async function startSlack(): Promise<App | null> {
                         initial_comment: text || undefined,
                     });
                 } catch (err: any) {
-                    await respond({ text: `畫到但上傳失敗: ${err?.message || "未知錯誤"}`, ...cmdVis() });
+                    await respond({
+                        text: `畫到但上傳失敗: ${err?.message || "未知錯誤"}`,
+                        ...cmdVis(),
+                    });
                 }
             } else {
-                await respond({ text: text ? `${text}` : "畫唔到", ...cmdVis() });
+                await respond({
+                    text: text ? `${text}` : "畫唔到",
+                    ...cmdVis(),
+                });
             }
         } catch (error: any) {
-            await respond({ text: `畫唔到: ${error?.response?.data?.error?.message || error.message}`, ...cmdVis() });
+            await respond({
+                text: `畫唔到: ${error?.response?.data?.error?.message || error.message}`,
+                ...cmdVis(),
+            });
         }
     });
 
@@ -730,7 +840,10 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         const payload = (command.text || "").trim();
         if (!payload) {
-            await respond({ text: "想去邊？格式：/transportation <出發地>去<目的地>\n例如：/transportation 旺角去中環", ...cmdVis() });
+            await respond({
+                text: "想去邊？格式：/transportation <出發地>去<目的地>\n例如：/transportation 旺角去中環",
+                ...cmdVis(),
+            });
             return;
         }
         // 行返共用 AI flow
@@ -788,13 +901,21 @@ export async function startSlack(): Promise<App | null> {
         const ownerId = b.actions?.[0]?.value;
         const userId = b.user?.id;
         if (!userId || (ownerId && ownerId !== userId)) {
-            await respond({ text: "❌ 呢個 menu 唔係俾你㩒嘅", response_type: "ephemeral", replace_original: false });
+            await respond({
+                text: "❌ 呢個 menu 唔係俾你㩒嘅",
+                response_type: "ephemeral",
+                replace_original: false,
+            });
             return;
         }
         const st = store.getUserState(userId);
         const name = await getUserName(app.client, userId);
         if (!canIncrementDay(st.day_updated_at)) {
-            await respond({ text: "你今日咪撳撚左囉，仲撳多次做乜柒姐?", response_type: "ephemeral", replace_original: true });
+            await respond({
+                text: "你今日咪撳撚左囉，仲撳多次做乜柒姐?",
+                response_type: "ephemeral",
+                replace_original: true,
+            });
             return;
         }
         store.updateUserState(userId, {
@@ -815,12 +936,23 @@ export async function startSlack(): Promise<App | null> {
         const ownerId = b.actions?.[0]?.value;
         const userId = b.user?.id;
         if (!userId || (ownerId && ownerId !== userId)) {
-            await respond({ text: "❌ 呢個 menu 唔係俾你㩒嘅", response_type: "ephemeral", replace_original: false });
+            await respond({
+                text: "❌ 呢個 menu 唔係俾你㩒嘅",
+                response_type: "ephemeral",
+                replace_original: false,
+            });
             return;
         }
         const name = await getUserName(app.client, userId);
-        store.updateUserState(userId, { day: 0, day_updated_at: undefined, first_name: name });
-        await respond({ text: `${name} | Day0（已 reset）`, replace_original: true });
+        store.updateUserState(userId, {
+            day: 0,
+            day_updated_at: undefined,
+            first_name: name,
+        });
+        await respond({
+            text: `${name} | Day0（已 reset）`,
+            replace_original: true,
+        });
     });
 
     // ── /me ──
@@ -860,12 +992,30 @@ export async function startSlack(): Promise<App | null> {
             ...cmdVis(),
             text: `🎰 馬會提醒（呢個 channel）— ${state}`,
             blocks: [
-                { type: "section", text: { type: "mrkdwn", text: `🎰 *馬會提醒*（channel）— ${state}` } },
+                {
+                    type: "section",
+                    text: {
+                        type: "mrkdwn",
+                        text: `🎰 *馬會提醒*（channel）— ${state}`,
+                    },
+                },
                 {
                     type: "actions",
                     elements: [
-                        { type: "button", text: { type: "plain_text", text: "🟢 開啟提醒" }, action_id: "marksix_on", value: channelId, style: "primary" },
-                        { type: "button", text: { type: "plain_text", text: "🔴 停用提醒" }, action_id: "marksix_off", value: channelId, style: "danger" },
+                        {
+                            type: "button",
+                            text: { type: "plain_text", text: "🟢 開啟提醒" },
+                            action_id: "marksix_on",
+                            value: channelId,
+                            style: "primary",
+                        },
+                        {
+                            type: "button",
+                            text: { type: "plain_text", text: "🔴 停用提醒" },
+                            action_id: "marksix_off",
+                            value: channelId,
+                            style: "danger",
+                        },
                     ],
                 },
             ],
@@ -892,7 +1042,9 @@ export async function startSlack(): Promise<App | null> {
         if (!channelId) return;
         const ok = disableSlackMarksix(channelId);
         await respond({
-            text: ok ? `✅ 已停用 channel ${channelId} 嘅馬會提醒` : `❌ 呢個 channel 冇設定過馬會提醒`,
+            text: ok
+                ? `✅ 已停用 channel ${channelId} 嘅馬會提醒`
+                : `❌ 呢個 channel 冇設定過馬會提醒`,
             replace_original: true,
         });
     });
@@ -931,19 +1083,29 @@ export async function startSlack(): Promise<App | null> {
                             type: "input",
                             block_id: "rem_date",
                             label: { type: "plain_text", text: "日期" },
-                            element: { type: "datepicker", action_id: "rem_date_input" },
+                            element: {
+                                type: "datepicker",
+                                action_id: "rem_date_input",
+                            },
                         },
                         {
                             type: "input",
                             block_id: "rem_time",
                             label: { type: "plain_text", text: "時間（香港）" },
-                            element: { type: "timepicker", action_id: "rem_time_input", initial_time: "09:00" },
+                            element: {
+                                type: "timepicker",
+                                action_id: "rem_time_input",
+                                initial_time: "09:00",
+                            },
                         },
                     ],
                 },
             });
         } catch (err: any) {
-            console.log("❌ slack reminder modal open 失敗:", err?.message || err);
+            console.log(
+                "❌ slack reminder modal open 失敗:",
+                err?.message || err
+            );
         }
     });
 
@@ -955,14 +1117,24 @@ export async function startSlack(): Promise<App | null> {
         const time = vals.rem_time?.rem_time_input?.selected_time || "";
         const meta = JSON.parse(v.private_metadata || "{}");
         if (!text || !date || !time) {
-            await ack({ response_action: "errors", errors: { rem_text: "內容、日期同時間都要填" } });
+            await ack({
+                response_action: "errors",
+                errors: { rem_text: "內容、日期同時間都要填" },
+            });
             return;
         }
         // date/time picker 都係 local time —— 當香港時間處理（同 tg 一致）
-        const remindAt = dayjs.tz(`${date} ${time}`, "YYYY-MM-DD HH:mm", "Asia/Hong_Kong");
+        const remindAt = dayjs.tz(
+            `${date} ${time}`,
+            "YYYY-MM-DD HH:mm",
+            "Asia/Hong_Kong"
+        );
         const nowInHK = dayjs().tz("Asia/Hong_Kong");
         if (remindAt.isBefore(nowInHK)) {
-            await ack({ response_action: "errors", errors: { rem_time: "時間已過，揀返將來嘅時間" } });
+            await ack({
+                response_action: "errors",
+                errors: { rem_time: "時間已過，揀返將來嘅時間" },
+            });
             return;
         }
         const row: store.SlackReminderRow = {
@@ -978,18 +1150,23 @@ export async function startSlack(): Promise<App | null> {
         await ack();
         // 確認訊息（ephemeral 俾 set 嗰個人）
         const name = await getUserName(client, meta.user_id);
-        await client.chat.postEphemeral({
-            channel: meta.channel_id,
-            user: meta.user_id,
-            text: `✅ 已設定提醒：\n📝 ${text}\n⏰ ${remindAt.format("YYYY-MM-DD HH:mm")}（${name}）`,
-        }).catch(() => {});
+        await client.chat
+            .postEphemeral({
+                channel: meta.channel_id,
+                user: meta.user_id,
+                text: `✅ 已設定提醒：\n📝 ${text}\n⏰ ${remindAt.format("YYYY-MM-DD HH:mm")}（${name}）`,
+            })
+            .catch(() => {});
     });
 
     // ── /pause、/resume（admin only：暫停 / 恢復呢條 channel 嘅 AI）──
     app.command("/pause", async ({ ack, respond, command }) => {
         await ack();
         if (!SLACK_ADMIN_IDS.includes(command.user_id)) {
-            await respond({ text: "❌ 得 admin 先可以 pause AI（SLACK_ADMIN_IDS）", ...cmdVis() });
+            await respond({
+                text: "❌ 得 admin 先可以 pause AI（SLACK_ADMIN_IDS）",
+                ...cmdVis(),
+            });
             return;
         }
         pauseAI(command.channel_id);
@@ -1003,15 +1180,16 @@ export async function startSlack(): Promise<App | null> {
     app.command("/resume", async ({ ack, respond, command }) => {
         await ack();
         if (!SLACK_ADMIN_IDS.includes(command.user_id)) {
-            await respond({ text: "❌ 得 admin 先可以 resume AI（SLACK_ADMIN_IDS）", ...cmdVis() });
+            await respond({
+                text: "❌ 得 admin 先可以 resume AI（SLACK_ADMIN_IDS）",
+                ...cmdVis(),
+            });
             return;
         }
         resumeAI(command.channel_id);
         const all = getPausedChannels();
         await respond({
-            text: all.length
-                ? `✅ AI 已恢復（仲有 ${all.length} 條 channel 暫停緊）`
-                : "✅ AI 已恢復，冇任何 channel 暫停緊",
+            text: "✅ AI 已恢復",
             ...cmdVis(),
         });
     });
@@ -1020,13 +1198,21 @@ export async function startSlack(): Promise<App | null> {
     app.command("/quit", async ({ ack, respond, command }) => {
         await ack();
         if (!SLACK_ADMIN_IDS.includes(command.user_id)) {
-            await respond({ text: "踢你老母臭（得 admin 先可以叫我走）", ...cmdVis() });
+            await respond({
+                text: "踢你老母臭（得 admin 先可以叫我走）",
+                ...cmdVis(),
+            });
             return;
         }
         try {
-            await app.client.conversations.leave({ channel: command.channel_id });
+            await app.client.conversations.leave({
+                channel: command.channel_id,
+            });
         } catch (err: any) {
-            await respond({ text: `離開唔到: ${err?.message || "未知錯誤"}`, ...cmdVis() });
+            await respond({
+                text: `離開唔到: ${err?.message || "未知錯誤"}`,
+                ...cmdVis(),
+            });
         }
     });
 
