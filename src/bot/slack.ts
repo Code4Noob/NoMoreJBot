@@ -24,6 +24,11 @@ import hkdayjs from "../utils/dayjs";
 import dayjs from "dayjs";
 import { weather } from "../tools/weather";
 import { getStockQuote } from "../tools/stock";
+import {
+    fetchRadarGif,
+    fetchRadarImage,
+    parseRadarArgs,
+} from "../tools/radar";
 import { markSixReminder } from "../tools/marksix";
 import { from, validateJCount } from "../tools/date";
 import { generateImage, getActiveAI } from "../ai";
@@ -750,6 +755,36 @@ export async function startSlack(): Promise<App | null> {
         } catch (err: any) {
             await respond({
                 text: `股票查唔到: ${err?.message || "未知錯誤"}`,
+                ...cmdVis(),
+            });
+        }
+    });
+
+    // ── /radar（天文台雷達圖，加 gif 出縮時動態圖）──
+    app.command("/radar", async ({ ack, respond, command }) => {
+        await ack();
+        const { range, gif } = parseRadarArgs(command.text || "");
+        try {
+            let upload;
+            if (gif) {
+                await respond({
+                    text: "📡 整緊 3 小時雷達 GIF...",
+                    ...cmdVis(),
+                });
+                upload = await fetchRadarGif(range);
+            } else {
+                upload = await fetchRadarImage(range);
+            }
+            await app.client.files.uploadV2({
+                channel_id: command.channel_id,
+                file: upload.buffer,
+                filename: upload.filename,
+                title: upload.title,
+                initial_comment: upload.caption,
+            });
+        } catch (err: any) {
+            await respond({
+                text: `雷達查唔到: ${err?.message || "未知錯誤"}`,
                 ...cmdVis(),
             });
         }

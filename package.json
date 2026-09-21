@@ -6,7 +6,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build ./src/index.ts --outdir ./dist --target node --external playwright --external playwright-core --external node-fetch --external undici --external @slack/bolt",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node --external playwright --external playwright-core --external node-fetch --external undici --external @slack/bolt --external sharp",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "postinstall": "bun scripts/patch-telegraf.js && bun scripts/patch-slack.js"
@@ -18,11 +18,13 @@
     "@slack/bolt": "^4.7.3",
     "axios": "1.2.0-alpha.1",
     "dayjs": "^1.11.13",
+    "gif-encoder-2": "^1.0.5",
     "mongoose": "^6.13.8",
     "node-cron": "^3.0.3",
     "node-fetch": "^2.7.0",
     "node-openvpn": "^0.1.1",
     "playwright": "^1.62.1",
+    "sharp": "^0.35.4",
     "telegraf": "^4.16.3",
     "undici": "^6.21.1",
     "uuid": "^9.0.1",

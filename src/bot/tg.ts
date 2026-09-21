@@ -14,6 +14,11 @@ import {
 import { weather } from "../tools/weather";
 import { getStockQuote } from "../tools/stock";
 import {
+    fetchRadarGif,
+    fetchRadarImage,
+    parseRadarArgs,
+} from "../tools/radar";
+import {
     describeSticker,
     backfillStickerCache,
     resolveStickerId,
@@ -847,6 +852,23 @@ bot.command("stock", async (ctx) => {
     const rawSymbol = ctx.payload.trim().split(/\s+/)[0] || "";
     const message = await getStockQuote(rawSymbol);
     await ctx.reply(message);
+});
+
+bot.command("radar", async (ctx) => {
+    const { range, gif } = parseRadarArgs(ctx.payload);
+    try {
+        if (gif) {
+            await ctx.reply("📡 整緊 3 小時雷達 GIF...");
+            const { buffer, caption } = await fetchRadarGif(range);
+            await ctx.replyWithAnimation({ source: buffer }, { caption });
+        } else {
+            const { buffer, caption } = await fetchRadarImage(range);
+            await ctx.replyWithPhoto({ source: buffer }, { caption });
+        }
+    } catch (error: any) {
+        console.log("🚀 ~ radar error:", error?.message || error);
+        await ctx.reply(`雷達查唔到: ${error?.message || "未知錯誤"}`);
+    }
 });
 
 bot.command("marksix", async (ctx) => {

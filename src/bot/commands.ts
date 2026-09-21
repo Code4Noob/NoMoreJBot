@@ -20,6 +20,10 @@ const BOT_COMMANDS: BotCommandEntry[] = [
         command: "stock",
         description: "Stock & FX quote (0700.HK / AAPL / JPY / 1USD)",
     },
+    {
+        command: "radar",
+        description: "HKO radar image (64/128/256 km, add 'gif')",
+    },
     { command: "marksix", description: "Get Mark Six reminder" },
     {
         command: "marksix_remind",
