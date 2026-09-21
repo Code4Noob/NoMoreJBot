@@ -16,6 +16,10 @@ const BOT_COMMANDS: BotCommandEntry[] = [
     { command: "me", description: "Show your day count" },
     { command: "from", description: "Calculate time from a date (DD-MM-YYYY)" },
     { command: "weather", description: "Get weather forecast" },
+    {
+        command: "stock",
+        description: "Stock & FX quote (0700.HK / AAPL / JPY / 1USD)",
+    },
     { command: "marksix", description: "Get Mark Six reminder" },
     {
         command: "marksix_remind",

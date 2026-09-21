@@ -23,6 +23,7 @@ import { v4 as uuidv4 } from "uuid";
 import hkdayjs from "../utils/dayjs";
 import dayjs from "dayjs";
 import { weather } from "../tools/weather";
+import { getStockQuote } from "../tools/stock";
 import { markSixReminder } from "../tools/marksix";
 import { from, validateJCount } from "../tools/date";
 import { generateImage, getActiveAI } from "../ai";
@@ -734,6 +735,21 @@ export async function startSlack(): Promise<App | null> {
         } catch (err: any) {
             await respond({
                 text: `天氣查唔到: ${err?.message || "未知錯誤"}`,
+                ...cmdVis(),
+            });
+        }
+    });
+
+    // ── /stock（股市 & 外匯查詢）──
+    app.command("/stock", async ({ ack, respond, command }) => {
+        await ack();
+        const rawSymbol = (command.text || "").trim().split(/\s+/)[0] || "";
+        try {
+            const message = await getStockQuote(rawSymbol);
+            await respond({ text: message, ...cmdVis() });
+        } catch (err: any) {
+            await respond({
+                text: `股票查唔到: ${err?.message || "未知錯誤"}`,
                 ...cmdVis(),
             });
         }

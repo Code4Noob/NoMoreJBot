@@ -12,6 +12,7 @@ import {
     disableMarkSixReminder,
 } from "../scheduler/marksix";
 import { weather } from "../tools/weather";
+import { getStockQuote } from "../tools/stock";
 import {
     describeSticker,
     backfillStickerCache,
@@ -839,6 +840,12 @@ bot.command("from", async (ctx) => {
 
 bot.command("weather", async (ctx) => {
     const message = await weather();
+    await ctx.reply(message);
+});
+
+bot.command("stock", async (ctx) => {
+    const rawSymbol = ctx.payload.trim().split(/\s+/)[0] || "";
+    const message = await getStockQuote(rawSymbol);
     await ctx.reply(message);
 });
 
