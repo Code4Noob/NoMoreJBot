@@ -28,6 +28,11 @@ export interface RoundTripOptions {
      * text = 第一個 response 嘅文字（可能 null）；adapter 用嚟出「處理緊你嘅需求」feedback。
      */
     onGreeting?: (text: string | null) => void | Promise<void>;
+    /**
+     * 每個 round 之間檢查：return true 就即刻收手（唔再 call LLM）。
+     * adapter 用嚟做「admin 中途 /pause → 取消進行中嘅 request」。
+     */
+    isCancelled?: () => boolean;
 }
 
 export interface RoundTripResult {
@@ -35,6 +40,8 @@ export interface RoundTripResult {
     reply: string | null;
     /** 累計 token usage */
     usage: number;
+    /** 中途被 isCancelled 取消（admin /pause）→ adapter 唔好出 reply */
+    cancelled?: boolean;
 }
 
 /**
@@ -51,6 +58,20 @@ export async function runAIRoundTrip(o: RoundTripOptions): Promise<RoundTripResu
         messages: o.initialMessages,
         systemPrompt: o.systemPrompt,
     });
+
+    // isCancelled callback（admin 中途 /pause）；callback 掟錯都當作冇 cancel
+    const cancelled = () => {
+        try {
+            return o.isCancelled?.() ?? false;
+        } catch {
+            return false;
+        }
+    };
+
+    // 初 call 期間已經被 /pause → 即刻收手
+    if (cancelled()) {
+        return { reply: reply ?? null, usage: usage ?? 0, cancelled: true };
+    }
 
     // 第一個 response call 咗 greeting tool → 出「處理緊你嘅需求」feedback
     const callsGreetingTool = toolCalls?.some(
@@ -70,7 +91,8 @@ export async function runAIRoundTrip(o: RoundTripOptions): Promise<RoundTripResu
         toolCalls &&
         toolRoundsLeft > 0 &&
         currentTokenUsage < MAX_TOKENS &&
-        Date.now() - START < DEADLINE_MS
+        Date.now() - START < DEADLINE_MS &&
+        !cancelled()
     ) {
         toolRoundsLeft--;
         o.contextMessages.push({
@@ -123,7 +145,8 @@ export async function runAIRoundTrip(o: RoundTripOptions): Promise<RoundTripResu
     }
 
     // 超時（時間用盡）跳出 loop 而仲有 tool call 未處理 → 強制要 final answer
-    if (toolCalls && Date.now() - START >= DEADLINE_MS) {
+    // （被 /pause 取消就唔好再嘥一個 call 去迫 final answer）
+    if (toolCalls && !cancelled() && Date.now() - START >= DEADLINE_MS) {
         console.log("⏰ tool loop 超過 deadline，強制 final answer（唔再 call 工具）");
         try {
             const forced = await getAIResponse({
@@ -140,7 +163,7 @@ export async function runAIRoundTrip(o: RoundTripOptions): Promise<RoundTripResu
         }
     }
 
-    return { reply, usage };
+    return { reply, usage, cancelled: cancelled() };
 }
 
 // ────────────────────────────────────────────────────────────────────────────

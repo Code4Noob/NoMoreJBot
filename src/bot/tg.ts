@@ -349,7 +349,8 @@ async function handleAIRequest(
         return;
     }
     // 「輸入中…」指示器：sendChatAction 只維持 ~5 秒，要 interval 不斷續命
-    const stopTyping = startTyping(ctx);
+    // shouldStop()（admin 中途 /pause）return true 就即刻停，唔會繼續「輸入中…」
+    const stopTyping = startTyping(ctx, () => isAIPaused(ctx.chat?.id));
     try {
         // 支援非文字訊息（例如 sticker reply）——冇 text 就用預設 prompt
         const rawText = ctx.message.text || "";
@@ -466,7 +467,7 @@ async function handleAIRequest(
         };
 
         // 用共用 AI engine（tg / slack 同一套邏輯）：初 call + tool loop + deadline 強制收尾
-        const { reply: engineReply, usage } = await runAIRoundTrip({
+        const { reply: engineReply, usage, cancelled } = await runAIRoundTrip({
             initialMessages: chatContext.slice(-6),
             contextMessages,
             systemPrompt: buildSystemPrompt(MAX_TOOL_ROUNDS),
@@ -479,6 +480,13 @@ async function handleAIRequest(
                 await sendSectioned(ctx, t || "🔍 處理緊你嘅需求，請稍候…");
             },
         });
+
+        // admin 中途 /pause → 即刻收手：唔好出 AI 答案（typing 喺 finally 自動停）
+        if (cancelled) {
+            console.log(`😴 AI request 中途被 /pause 取消 (chat: ${chatId})`);
+            await ctx.reply(AI_PAUSED_MSG).catch(() => {});
+            return;
+        }
         let reply = engineReply;
 
         // Fallback if message is still null after all tool rounds
@@ -600,10 +608,17 @@ async function handleAIRequest(
 }
 
 // 「輸入中…」指示器：處理 AI 期間不斷 sendChatAction，回覆／出錯就停
-function startTyping(ctx: any): () => void {
-    const send = () => ctx.sendChatAction?.("typing").catch(() => {});
-    send();
+// shouldStop() 返 true（admin 中途 /pause）→ 清埋 interval，即刻收水
+function startTyping(ctx: any, shouldStop?: () => boolean): () => void {
+    const send = () => {
+        if (shouldStop?.()) {
+            clearInterval(timer);
+            return;
+        }
+        ctx.sendChatAction?.("typing").catch(() => {});
+    };
     const timer = setInterval(send, 4500);
+    send();
     return () => clearInterval(timer);
 }
 

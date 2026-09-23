@@ -281,7 +281,7 @@ async function handleSlackMessageText(
             .catch(() => {});
     }
 
-    const { reply: engineReply, usage } = await runAIRoundTrip({
+    const { reply: engineReply, usage, cancelled } = await runAIRoundTrip({
         initialMessages: chatContext.slice(-6),
         contextMessages,
         systemPrompt: buildSystemPrompt(MAX_TOOL_ROUNDS),
@@ -293,6 +293,13 @@ async function handleSlackMessageText(
             await post(t || "🔍 處理緊你嘅需求，請稍候…").catch(() => {});
         },
     });
+
+    // admin 中途 /pause → 唔好出 AI 答案；post 暫停訊息順便清埋「處理緊…」status
+    if (cancelled) {
+        console.log(`😴 AI request 中途被 /pause 取消 (channel: ${channelId})`);
+        await post(AI_PAUSED_MSG).catch(() => {});
+        return;
+    }
 
     let reply = engineReply || "冇嘢想講";
     reply = extractUserSkill(reply, userId); // [user_skill] → 更新 Slack user 專屬人格
