@@ -143,6 +143,15 @@ export function resolveStickerId(id: string): string | null {
 }
 
 /**
+ * Telegram file_id 係 base64url，長度通常 > 50 字符。
+ * AI 有時會出貼圖名（例如 LIHKG_Cow_HD_Official_牛無奈）而唔係 id，
+ * 直接 send 會 400 "wrong remote file identifier"，所以先驗證。
+ */
+export function isPlausibleFileId(id: string): boolean {
+    return /^[A-Za-z0-9_-]+$/.test(id) && id.length >= 50;
+}
+
+/**
  * 將舊 cache entry（喺加 fileId 之前 cache 落嚟嘅）補返 fileId：
  * 用 setName 攞返個 sticker set，再按 file_unique_id（cache key）搵返張貼圖攞 file_id。
  * 喺 bot 啟動時 call 一次。

@@ -22,6 +22,7 @@ import {
     describeSticker,
     backfillStickerCache,
     resolveStickerId,
+    isPlausibleFileId,
 } from "../tools/sticker";
 import vpnAxios, { detectTunnelIP } from "../utils/vpn";
 import { generateImage, getActiveAI } from "../ai";
@@ -311,11 +312,19 @@ async function sendStickers(ctx: any, stickerIds: string[]): Promise<void> {
     const toSend = [...new Set(stickerIds)].slice(0, 5);
     for (const stickerId of toSend) {
         try {
-            const realFileId = resolveStickerId(stickerId) || stickerId;
-            await ctx.replyWithSticker(realFileId);
+            // 優先用 cache resolve；resolve 唔到就要驗證個 id 似唔似真 file_id，
+            // 避免 AI 出咗貼圖名（例如 LIHKG_Cow_HD_Official_牛無奈）直接當 file_id 送，
+            // 令 Telegram 擲 400 "wrong remote file identifier"。
+            const fileId =
+                resolveStickerId(stickerId) ||
+                (isPlausibleFileId(stickerId) ? stickerId : null);
+            if (!fileId) {
+                console.log(`⚠️ skip 貼圖（resolve 唔到，AI 可能出咗貼圖名而唔係 id）: ${stickerId}`);
+                continue;
+            }
+            await ctx.replyWithSticker(fileId);
         } catch (stickerErr: any) {
-            console.log("🚀 ~ sticker reply error:", stickerErr);
-            await ctx.reply(`貼圖派唔到: ${stickerErr?.message || "未知錯誤"}`);
+            console.log("🚀 ~ sticker reply error:", stickerErr?.message || stickerErr);
         }
     }
 }
@@ -517,8 +526,16 @@ async function handleAIRequest(
         );
         if (reply) {
             chatContext.push({ role: "assistant", content: reply });
+            // 歷史唔好記低 [sticker] marker —— AI 之後會照抄入面嘅字當 id 用
+            //（佢見過自己出「[sticker]: LIHKG_Cow_HD_Official_牛無奈」就跟住出貼圖名）
+            const historyReply = reply
+                .replace(
+                    /\[sticker\]\s*:\s*\S+|\[sticker:\s*[^\]]*\]/gi,
+                    " [派咗張貼圖] "
+                )
+                .trim();
             // Also store bot reply in file-based history
-            appendToHistory(chatId, "Bot", reply);
+            appendToHistory(chatId, "Bot", historyReply);
         }
 
         // 🎨 檢查 AI 回覆是否包含圖片生成 / 編輯指令
